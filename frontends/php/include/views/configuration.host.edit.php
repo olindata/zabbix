@@ -408,6 +408,16 @@
 	$divTabs->addTab('hostTab', _('Host'), $hostList);
 // } HOST WIDGET
 
+// AUTHENTICATION WIDGET {
+    $authList = new CFormList('authlist');
+
+    $authList->addRow(_('Enable authentication'), new CCheckBox('auth_enabled', 'yes', null, 'yes'));
+	$authList->addRow(_('Username'), new CTextBox('auth_username', $auth_username, 20));
+	$authList->addRow(_('Password'), new CTextBox('auth_password', $auth_password, 20));
+
+    $divTabs->addTab('authenticationTab', _('Authentication'), $authList);
+// } AUTHENTICATION WIDGET
+
 // TEMPLATES{
 	$tmplList = new CFormList('tmpllist');
 
