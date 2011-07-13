@@ -1,0 +1,16 @@
+^\..*
+*.diff
+
+a.out.dSYM/
+autom4te.cache/
+
+Makefile.in
+WARNINGS
+aclocal.m4
+compile
+config.*
+configure
+depcomp
+include/config.h.in
+install-sh
+missing

@@ -633,6 +633,7 @@ FIELD		|jmx_available	|t_integer	|'0'	|NOT NULL	|ZBX_SYNC
 FIELD		|jmx_errors_from|t_integer	|'0'	|NOT NULL	|0
 FIELD		|jmx_error	|t_varchar(128)	|''	|NOT NULL	|ZBX_SYNC
 FIELD		|name		|t_varchar(64)	|''	|NOT NULL	|ZBX_SYNC
+FIELD		|auth_password	|t_char(20)	|	|NULL		|ZBX_SYNC,ZBX_PROXY
 INDEX		|1		|host
 INDEX		|2		|status
 INDEX		|3		|proxy_hostid
