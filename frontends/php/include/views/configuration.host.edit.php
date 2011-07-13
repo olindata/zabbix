@@ -230,7 +230,10 @@
 	$cmbStatus->addItem(HOST_STATUS_MONITORED,	_('Monitored'));
 	$cmbStatus->addItem(HOST_STATUS_NOT_MONITORED,	_('Not monitored'));
 
+// Authentication
 	$hostList->addRow(_('Status'),$cmbStatus);
+    $hostList->addRow(_('Enable authentication'), new CCheckBox('auth_enabled', 'yes', null, 'yes'));
+    $hostList->addRow(_('Password'), new CPassBox('auth_password'));
 
 	if($_REQUEST['form'] == 'full_clone'){
 		// host items
@@ -407,16 +410,6 @@
 
 	$divTabs->addTab('hostTab', _('Host'), $hostList);
 // } HOST WIDGET
-
-// AUTHENTICATION WIDGET {
-    $authList = new CFormList('authlist');
-
-    $authList->addRow(_('Enable authentication'), new CCheckBox('auth_enabled', 'yes', null, 'yes'));
-	$authList->addRow(_('Username'), new CTextBox('auth_username', $auth_username, 20));
-	$authList->addRow(_('Password'), new CTextBox('auth_password', $auth_password, 20));
-
-    $divTabs->addTab('authenticationTab', _('Authentication'), $authList);
-// } AUTHENTICATION WIDGET
 
 // TEMPLATES{
 	$tmplList = new CFormList('tmpllist');
