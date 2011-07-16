@@ -57,6 +57,8 @@ include_once('include/page_header.php');
 		'visiblename'=>		array(T_ZBX_STR, O_OPT,	null,   null,			'isset({save})'),
 		'proxy_hostid'=>	array(T_ZBX_INT, O_OPT,	P_SYS,	DB_ID,			'isset({save})'),
 		'status'=>			array(T_ZBX_INT, O_OPT,	null,	IN('0,1,3'),		'isset({save})'),
+        'auth_enabled'=>    array(T_ZBX_INT, O_OPT, null,   null,       null),
+        'auth_password'=>   array(T_ZBX_STR, O_OPT, null,   null,       'isset{{auth_enabled}}'),
 
 		'newgroup'=>		array(T_ZBX_STR, O_OPT, null,   null,		null),
 		'interfaces'=>		array(T_ZBX_STR, O_OPT,	null,	NOT_EMPTY,	'isset({save})'),
@@ -344,6 +346,8 @@ include_once('include/page_header.php');
 		$_REQUEST['newgroup'] = get_request('newgroup', '');
 		$_REQUEST['proxy_hostid'] = get_request('proxy_hostid', 0);
 		$_REQUEST['templates'] = get_request('templates', array());
+        $_REQUEST['auth_enabled'] = get_request('auth_enabled', 1);
+        $_REQUEST['auth_password'] = get_request('auth_password', '');
 
 		try{
 			DBstart();
@@ -520,7 +524,9 @@ include_once('include/page_header.php');
 				'interfaces' => $interfaces,
 				'macros' => $macros,
 				'profile' => (get_request('profile_mode') != HOST_PROFILE_DISABLED) ? get_request('host_profile', array()) : array(),
-				'profile_mode' => get_request('profile_mode')
+				'profile_mode' => get_request('profile_mode'),
+                'auth_enabled' => get_request('auth_enabled'),
+                'auth_password' => get_request('auth_password')
 			);
 
 			if($create_new){

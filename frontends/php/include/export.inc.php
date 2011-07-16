@@ -42,6 +42,8 @@ class zbxXML{
 				'ipmi_privilege'	=> '',
 				'ipmi_username'		=> '',
 				'ipmi_password'		=> '',
+                'auth_enabled'      => '',
+                'auth_password'     => ''
 			)
 		),
 		XML_TAG_MACRO => array(

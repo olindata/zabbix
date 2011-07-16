@@ -1468,6 +1468,8 @@ Copt::memoryPick();
  * @param int $hosts['ipmi_privilege'] IPMI privilege. OPTIONAL
  * @param string $hosts['ipmi_username'] IPMI username. OPTIONAL
  * @param string $hosts['ipmi_password'] IPMI password. OPTIONAL
+ * @param int $hosts['auth_enabled'] Enable authentication. OPTIONAL
+ * @param string $hosts['auth_password'] Authentication password. OPTIONAL
  * @return boolean
  */
 	public function create($hosts){
@@ -1539,6 +1541,8 @@ Copt::memoryPick();
  * @param string $hosts['ipmi_username'] IPMI username. OPTIONAL
  * @param string $hosts['ipmi_password'] IPMI password. OPTIONAL
  * @param string $hosts['groups'] groups
+ * @param int $hosts['auth_enabled'] Enable authentication. OPTIONAL
+ * @param string $hosts['auth_password'] Authentication password. OPTIONAL
  * @return boolean
  */
 	public function update($hosts){
@@ -1690,6 +1694,8 @@ Copt::memoryPick();
  * @param int $hosts['fields']['ipmi_privilege'] IPMI privilege. OPTIONAL
  * @param string $hosts['fields']['ipmi_username'] IPMI username. OPTIONAL
  * @param string $hosts['fields']['ipmi_password'] IPMI password. OPTIONAL
+ * @param int $hosts['fields']['auth_enabled'] Enable authentication. OPTIONAL
+ * @param string $hosts['fields']['auth_password'] Authentication password. OPTIONAL
  * @return boolean
  */
 	public function massUpdate($data){

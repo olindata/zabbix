@@ -39,6 +39,8 @@
 	$visiblename= get_request('visiblename',	'');
 	$status		= get_request('status',	HOST_STATUS_MONITORED);
 	$proxy_hostid	= get_request('proxy_hostid','');
+    $auth_enabled = get_request('auth_enabled', 1);
+    $auth_password = get_request('auth_password', '');
 
 	$ipmi_authtype	= get_request('ipmi_authtype',-1);
 	$ipmi_privilege	= get_request('ipmi_privilege',2);
@@ -112,6 +114,8 @@
 		if($visiblename == $host)
 			$visiblename='';
 		$status			= $dbHost['status'];
+        $auth_enabled   = $dbHost['auth_enabled'];
+        $auth_password  = $dbHost['auth_password'];
 
 		$ipmi_authtype		= $dbHost['ipmi_authtype'];
 		$ipmi_privilege		= $dbHost['ipmi_privilege'];
@@ -232,7 +236,7 @@
 
 // Authentication
 	$hostList->addRow(_('Status'),$cmbStatus);
-    $hostList->addRow(_('Enable authentication'), new CCheckBox('auth_enabled', 'yes', null, 'yes'));
+    $hostList->addRow(_('Enable authentication'), new CCheckBox('auth_enabled', 1, null, 1));
     $hostList->addRow(_('Password'), new CPassBox('auth_password'));
 
 	if($_REQUEST['form'] == 'full_clone'){
