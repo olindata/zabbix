@@ -2903,6 +2903,18 @@ return array(
 				'length' => 64,
 				'default' => '',
 			),
+            'auth_enabled' => array(
+                'null' => false,
+                'type' => DB::FIELD_TYPE_INT,
+                'length' => 10,
+                'default' => '1',
+            ),
+            'auth_password' => array(
+                'null' => true,
+                'type' => DB::FIELD_TYPE_CHAR,
+                'length' => 20,
+                'default' => ''
+            )
 		),
 	),
 	'interface' => array(

@@ -471,6 +471,7 @@
 	'S_PROXY_ACTIVE' => _('Active'),
 
 //  Authentication
+    'S_AUTH_ENABLED'=>              _('Enable authentication'),
 	'S_AUTHENTICATION'=>			_('Authentication'),
 	'S_AUTHENTICATION_TO_ZABBIX'=>	_('Authentication to Zabbix'),
 	'S_BASE_DN'=>					_('Base DN'),
@@ -775,6 +776,8 @@
 	'S_INTERFACES' =>				_('Interfaces'),
 	'S_INTERFACE' =>				_('Interface'),
 	'S_JMX' =>						_('JMX'),
+	'S_AUTH_ENABLED'=>				_('IPMI username'),
+	'S_AUTH_PASSWORD'=>				_('IPMI username'),
 
 // templates.php
 	'S_TEMPLATE_LIST'=>			_('Templates list'),
