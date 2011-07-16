@@ -58,7 +58,7 @@ include_once('include/page_header.php');
 		'proxy_hostid'=>	array(T_ZBX_INT, O_OPT,	P_SYS,	DB_ID,			'isset({save})'),
 		'status'=>			array(T_ZBX_INT, O_OPT,	null,	IN('0,1,3'),		'isset({save})'),
         'auth_enabled'=>    array(T_ZBX_INT, O_OPT, null,   null,       null),
-        'auth_password'=>   array(T_ZBX_STR, O_OPT, null,   null,       'isset{{auth_enabled}}'),
+        'auth_password'=>   array(T_ZBX_STR, O_OPT, null,   null,       null),
 
 		'newgroup'=>		array(T_ZBX_STR, O_OPT, null,   null,		null),
 		'interfaces'=>		array(T_ZBX_STR, O_OPT,	null,	NOT_EMPTY,	'isset({save})'),
@@ -346,7 +346,7 @@ include_once('include/page_header.php');
 		$_REQUEST['newgroup'] = get_request('newgroup', '');
 		$_REQUEST['proxy_hostid'] = get_request('proxy_hostid', 0);
 		$_REQUEST['templates'] = get_request('templates', array());
-        $_REQUEST['auth_enabled'] = get_request('auth_enabled', 1);
+        $_REQUEST['auth_enabled'] = get_request('auth_enabled');
         $_REQUEST['auth_password'] = get_request('auth_password', '');
 
 		try{
@@ -528,6 +528,11 @@ include_once('include/page_header.php');
                 'auth_enabled' => get_request('auth_enabled'),
                 'auth_password' => get_request('auth_password')
 			);
+
+            if(! isset($host['auth_enabled'])) {
+                $host['auth_enabled'] = 0;
+                $host['auth_password'] = null;
+            }
 
 			if($create_new){
 				$hostids = API::Host()->create($host);

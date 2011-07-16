@@ -471,7 +471,6 @@
 	'S_PROXY_ACTIVE' => _('Active'),
 
 //  Authentication
-    'S_AUTH_ENABLED'=>              _('Enable authentication'),
 	'S_AUTHENTICATION'=>			_('Authentication'),
 	'S_AUTHENTICATION_TO_ZABBIX'=>	_('Authentication to Zabbix'),
 	'S_BASE_DN'=>					_('Base DN'),

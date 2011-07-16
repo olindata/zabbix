@@ -1,9 +1,13 @@
 ^\..*
+*.a
+*.o
 *.diff
 
+# Compilation files
 a.out.dSYM/
 autom4te.cache/
-
+.deps
+Makefile
 Makefile.in
 WARNINGS
 aclocal.m4
@@ -14,3 +18,24 @@ depcomp
 include/config.h.in
 install-sh
 missing
+
+# Binaries and generated file
+bin/zabbix_get
+bin/zabbix_sender
+create/schema/ibm_db2.sql
+create/schema/mysql.sql
+create/schema/oracle.sql
+create/schema/postgresql.sql
+create/schema/sqlite3.sql
+frontends/php/conf/zabbix.conf.php
+include/stamp-h1
+sbin/
+share/
+src/libs/zbxdbhigh/dbschema.c
+src/zabbix_agent/zabbix_agent
+src/zabbix_agent/zabbix_agentd
+src/zabbix_get/zabbix_get
+src/zabbix_proxy/zabbix_proxy
+src/zabbix_sender/zabbix_sender
+src/zabbix_server/zabbix_server
+upgrades/dbpatches/*/*/patch.sql

@@ -39,7 +39,7 @@
 	$visiblename= get_request('visiblename',	'');
 	$status		= get_request('status',	HOST_STATUS_MONITORED);
 	$proxy_hostid	= get_request('proxy_hostid','');
-    $auth_enabled = get_request('auth_enabled', 1);
+    $auth_enabled = get_request('auth_enabled');
     $auth_password = get_request('auth_password', '');
 
 	$ipmi_authtype	= get_request('ipmi_authtype',-1);
@@ -236,8 +236,9 @@
 
 // Authentication
 	$hostList->addRow(_('Status'),$cmbStatus);
-    $hostList->addRow(S_AUTH_ENABLED, new CCheckBox('auth_enabled', 'yes', null, $auth_enabled));
-    $hostList->addRow(S_PASSWORD, new CPassBox('auth_password'));
+    //TODO: Add script to disable the password field?
+    $hostList->addRow(S_AUTHENTICATION.SPACE.S_ENABLED, new CCheckBox('auth_enabled', ($auth_enabled == 0 ? 'no' : 'yes'), null));
+    $hostList->addRow(S_PASSWORD, new CTextBox('auth_password', $auth_password));
 
 	if($_REQUEST['form'] == 'full_clone'){
 		// host items
