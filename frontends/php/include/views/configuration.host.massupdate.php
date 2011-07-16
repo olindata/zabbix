@@ -249,7 +249,7 @@ if($profile_mode != HOST_PROFILE_DISABLED){
 
 $frmHost->addRow(array(
 	new CVisibilityBox('visible[auth_enabled]', isset($visible['auth_enabled']), 'auth_enabled', S_ORIGINAL), S_AUTH_ENABLED),
-    new CCheckBox('auth_enabled', 1, null, 1)
+    new CCheckBox('auth_enabled', 'yes', null, $auth_enabled)
 );
 
 $frmHost->addRow(array(

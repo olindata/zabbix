@@ -236,7 +236,7 @@
 
 // Authentication
 	$hostList->addRow(_('Status'),$cmbStatus);
-    $hostList->addRow(S_AUTH_ENABLED, new CCheckBox('auth_enabled', 1, null, 1));
+    $hostList->addRow(S_AUTH_ENABLED, new CCheckBox('auth_enabled', 'yes', null, $auth_enabled));
     $hostList->addRow(S_PASSWORD, new CPassBox('auth_password'));
 
 	if($_REQUEST['form'] == 'full_clone'){
