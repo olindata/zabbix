@@ -776,8 +776,6 @@
 	'S_INTERFACES' =>				_('Interfaces'),
 	'S_INTERFACE' =>				_('Interface'),
 	'S_JMX' =>						_('JMX'),
-	'S_AUTH_ENABLED'=>				_('IPMI username'),
-	'S_AUTH_PASSWORD'=>				_('IPMI username'),
 
 // templates.php
 	'S_TEMPLATE_LIST'=>			_('Templates list'),
