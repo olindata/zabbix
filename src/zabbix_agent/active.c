@@ -41,6 +41,7 @@ static ZBX_ACTIVE_METRIC	*active_metrics = NULL;
 static ZBX_ACTIVE_BUFFER	buffer;
 static ZBX_REGEXP		*regexps = NULL;
 static int			regexps_alloc = 0, regexps_num = 0;
+int				authenticated = 0;
 
 static void	init_active_metrics()
 {
@@ -355,6 +356,9 @@ static int	refresh_active_checks(const char *host, unsigned short port)
 
 	zbx_json_addstring(&json, ZBX_PROTO_TAG_REQUEST, ZBX_PROTO_VALUE_GET_ACTIVE_CHECKS, ZBX_JSON_TYPE_STRING);
 	zbx_json_addstring(&json, ZBX_PROTO_TAG_HOST, CONFIG_HOSTNAME, ZBX_JSON_TYPE_STRING);
+	if(authenticated == 0) {
+		zbx_json_addstring(&json, ZBX_PROTO_TAG_PASSWORD, CONFIG_PASSWORD, ZBX_JSON_TYPE_STRING);
+	}
 
 	if (NULL != CONFIG_LISTEN_IP)
 	{
@@ -422,6 +426,7 @@ static int	check_response(char *response)
 	char			value[MAX_STRING_LEN];
 	char			info[MAX_STRING_LEN];
 	int			ret = SUCCEED;
+	int			auth_parsed = FAIL;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() response:'%s'", __function_name, response);
 
@@ -432,6 +437,13 @@ static int	check_response(char *response)
 
 	if (SUCCEED == ret && 0 != strcmp(value, ZBX_PROTO_VALUE_SUCCESS))
 		ret = FAIL;
+
+	if (ret == FAIL) {
+		auth_parsed = zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_AUTH_REQUIRED, value, sizeof(value));
+		if (SUCCEED == auth_parsed && 1 == atoi(value)) {
+			authenticated = 0;
+		}
+	}
 
 	if (SUCCEED == ret && SUCCEED == zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_INFO, info, sizeof(info)))
 		zabbix_log(LOG_LEVEL_DEBUG, "Info from server: %s", info);

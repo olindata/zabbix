@@ -26,6 +26,7 @@
 #include "active.h"
 
 extern unsigned char	daemon_type;
+int		AUTH_SESSION_TIMEOUT = 360; // Authentication session timeout
 
 /******************************************************************************
  *                                                                            *
@@ -65,7 +66,7 @@ static int	get_hostid_by_host(const char *host, const char *ip, unsigned short p
 			" from hosts"
 			" where host='%s'"
 				" and status in (%d,%d)"
-		       		" and proxy_hostid is null"
+				" and proxy_hostid is null"
 				DB_NODE,
 			host_esc,
 			HOST_STATUS_MONITORED,
@@ -113,6 +114,117 @@ static int	get_hostid_by_host(const char *host, const char *ip, unsigned short p
 	zbx_free(host_esc);
 
 	return res;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: check_auth_session                                               *
+ *                                                                            *
+ * Purpose: check whether the host is currently authenticated                 *
+ *                                                                            *
+ * Parameters: hostid - The host ID                                           *
+ *                                                                            *
+ * Return value:  SUCCEED - processed successfully                            *
+ *                FAIL - an error occurred                                    *
+ *                                                                            *
+ * Author: Seh Hui Leong                                                      *
+ *                                                                            *
+ ******************************************************************************/
+int check_auth_session(zbx_uint64_t hostid, int *authenticated, char *error)
+{
+	DB_RESULT	result;
+	DB_ROW		row;
+	int		lastaccess = -1;
+	int		ret = FAIL;
+
+	result = DBselect(
+		"select lastaccess"
+		" from hosts"
+		" where hostid='%s' and status=%d",
+		hostid, HOST_STATUS_MONITORED);
+
+	if (NULL != (row = DBfetch(result)))
+	{
+		lastaccess = atoi(row[0]);
+		ret = SUCCEED;
+	}
+	else
+		*error = zbx_dsprintf(*error, "Host \"%d\" is not monitored or does not exist", hostid);
+	DBfree_result(result);
+
+	if((int)(time(NULL)) < lastaccess + AUTH_SESSION_TIMEOUT) {
+		*authenticated = 1;
+	} else {
+		*authenticated = 0;
+	}
+
+	return ret;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: update_auth_session                                              *
+ *                                                                            *
+ * Purpose: update the authentication session timeout                         *
+ *                                                                            *
+ * Parameters: hostid - The host ID                                           *
+ *                                                                            *
+ * Return value:  SUCCEED - processed successfully                            *
+ *                FAIL - an error occurred                                    *
+ *                                                                            *
+ * Author: Seh Hui Leong                                                      *
+ *                                                                            *
+ ******************************************************************************/
+int authenticate(zbx_uint64_t hostid, char *password, int *valid, char *error)
+{
+	DB_RESULT	result;
+	DB_ROW		row;
+	int		lastaccess;
+	int		ret = FAIL;
+	const char	*stored_password;
+
+	result = DBselect(
+		"select auth_password"
+		" from hosts"
+		" where hostid='%s' and status=%d",
+		hostid, HOST_STATUS_MONITORED);
+
+	if (NULL != (row = DBfetch(result)))
+	{
+		lastaccess = atoi(row[0]);
+		ret = SUCCEED;
+	}
+	else
+		*error = zbx_dsprintf(*error, "Host \"%d\" is not monitored or does not exist", hostid);
+	DBfree_result(result);
+
+	if(SUCCEED == DBis_null(row[0])) {
+		*valid = 1;
+	} else {
+		stored_password = row[0];
+		*valid = (0 == strcmp(password, stored_password)) ? 1 : 0;
+	}
+
+	return ret;
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: update_auth_session                                              *
+ *                                                                            *
+ * Purpose: update the authentication session timeout                         *
+ *                                                                            *
+ * Parameters: hostid - The host ID                                           *
+ *                                                                            *
+ * Return value:  SUCCEED - processed successfully                            *
+ *                FAIL - an error occurred                                    *
+ *                                                                            *
+ * Author: Seh Hui Leong                                                      *
+ *                                                                            *
+ ******************************************************************************/
+void update_auth_session(zbx_uint64_t hostid, char *error)
+{
+	DBexecute("update hosts set lastaccess=%d where hostid=" ZBX_FS_UI64, time(NULL), hostid);
 }
 
 /******************************************************************************
@@ -209,8 +321,7 @@ int	send_list_of_active_checks(zbx_sock_t *sock, char *request)
 
 	zbx_snprintf_alloc(&buffer, &buffer_alloc, &buffer_offset, 512, "ZBX_EOF\n");
 
-	zabbix_log(LOG_LEVEL_DEBUG, "Sending [%s]",
-			buffer);
+	zabbix_log(LOG_LEVEL_DEBUG, "Sending [%s]", buffer);
 
 	alarm(CONFIG_TIMEOUT);
 	if (SUCCEED != zbx_tcp_send_raw(sock, buffer))
@@ -268,7 +379,8 @@ int	send_list_of_active_checks_json(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	char		host[HOST_HOST_LEN_MAX], *name_esc, params[MAX_STRING_LEN],
 			pattern[MAX_STRING_LEN], tmp[32],
 			key_severity[MAX_STRING_LEN], key_logeventid[MAX_STRING_LEN],
-			ip[INTERFACE_IP_LEN_MAX];
+			ip[INTERFACE_IP_LEN_MAX],
+			password[HOST_AUTH_PASSWORD_LEN_MAX];
 	DB_RESULT	result;
 	DB_ROW		row;
 	struct zbx_json	json;
@@ -277,6 +389,8 @@ int	send_list_of_active_checks_json(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	char		error[MAX_STRING_LEN], *key;
 	DC_ITEM		dc_item;
 	unsigned short	port;
+	int		auth = 0;
+	int		valid_password = 0;
 
 	char		**regexp = NULL;
 	int		regexp_alloc = 0;
@@ -300,11 +414,28 @@ int	send_list_of_active_checks_json(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	if (FAIL == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_PORT, tmp, sizeof(tmp)))
 		*tmp = '\0';
 
+	if (FAIL == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_PASSWORD, password, sizeof(password)))
+		*password = '\0';
+
 	if (FAIL == is_ushort(tmp, &port))
 		port = ZBX_DEFAULT_AGENT_PORT;
 
 	if (FAIL == get_hostid_by_host(host, ip, port, &hostid, error))
 		goto error;
+
+	if (FAIL == check_auth_session(hostid, &auth, error))
+		goto error;
+	if (auth != 1) {
+		if (FAIL == authenticate(hostid, password, &valid_password, error))
+			goto error;
+
+		if(valid_password != 1) {
+			zabbix_log(LOG_LEVEL_WARNING, "Host authentication from [%s] failed",
+					get_ip_by_socket(sock));
+			*error = zbx_dsprintf(*error, "Authentication required");
+			goto error;
+		}
+	}
 
 	sql = zbx_malloc(sql, sql_alloc);
 
@@ -461,6 +592,9 @@ int	send_list_of_active_checks_json(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	zbx_json_free(&json);
 	zbx_free(sql);
 
+	if(res == SUCCEED) {
+		update_auth_session(hostid, error);
+	}
 	return res;
 error:
 	zabbix_log(LOG_LEVEL_WARNING, "Sending list of active checks to [%s] failed: %s",
@@ -469,6 +603,7 @@ error:
 	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
 	zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_FAILED, ZBX_JSON_TYPE_STRING);
 	zbx_json_addstring(&json, ZBX_PROTO_TAG_INFO, error, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(&json, ZBX_PROTO_TAG_AUTH_REQUIRED, (auth != 1) ? 1 : 0, ZBX_JSON_TYPE_INT);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "Sending [%s]",
 			json.buffer);
