@@ -346,8 +346,6 @@ include_once('include/page_header.php');
 		$_REQUEST['newgroup'] = get_request('newgroup', '');
 		$_REQUEST['proxy_hostid'] = get_request('proxy_hostid', 0);
 		$_REQUEST['templates'] = get_request('templates', array());
-        $_REQUEST['auth_enabled'] = get_request('auth_enabled');
-        $_REQUEST['auth_password'] = get_request('auth_password', '');
 
 		try{
 			DBstart();
@@ -355,13 +353,28 @@ include_once('include/page_header.php');
 			$hosts = array('hosts' => zbx_toObject($hostids, 'hostid'));
 
 			$properties = array('proxy_hostid', 'ipmi_authtype',
-				'ipmi_privilege', 'ipmi_username', 'ipmi_password', 'status');
+                'ipmi_privilege', 'ipmi_username', 'ipmi_password', 'status',
+                'auth_enabled', 'auth_password');
 			$new_values = array();
 			foreach($properties as $property){
 				if(isset($visible[$property])){
+                    if($property == 'auth_enabled') {
+                        $_REQUEST['auth_enabled'] = get_request('auth_enabled', 0);
+                    }
+
+                    // Set the values
 					$new_values[$property] = $_REQUEST[$property];
 				}
 			}
+            if(in_array('auth_enabled', $new_values)) {
+                // Disabling authentication will override mass updating passwords
+                if($new_values['auth_enabled'] == 0) {
+                    $new_values['auth_password'] = '';
+                }
+            } else if(in_array('auth_password', $new_values)) {
+                // Enable the auth_enabled flag if it's not set yet
+                $new_values['auth_enabled'] == 1;
+            }
 
 // PROFILES {{{
 			if(isset($visible['profile_mode'])){
@@ -525,13 +538,12 @@ include_once('include/page_header.php');
 				'macros' => $macros,
 				'profile' => (get_request('profile_mode') != HOST_PROFILE_DISABLED) ? get_request('host_profile', array()) : array(),
 				'profile_mode' => get_request('profile_mode'),
-                'auth_enabled' => get_request('auth_enabled'),
+                'auth_enabled' => get_request('auth_enabled', 0),
                 'auth_password' => get_request('auth_password')
 			);
 
-            if(! isset($host['auth_enabled'])) {
-                $host['auth_enabled'] = 0;
-                $host['auth_password'] = null;
+            if($host['auth_enabled'] == 0) {
+                $host['auth_password'] = '';
             }
 
 			if($create_new){

@@ -131,6 +131,6 @@ UPDATE hosts SET name=host WHERE status in (0,1,3);	-- MONITORED, NOT_MONITORED,
 CREATE INDEX hosts_4 on hosts (name);
 ALTER TABLE hosts
         ADD COLUMN auth_enabled integer DEFAULT '0' NOT NULL,
-        ADD COLUMN auth_password char(20) NULL;
+        ADD COLUMN auth_password char(20) DEFAULT '' NOT NULL;
 ALTER TABLE hosts ADD CONSTRAINT c_hosts_1 FOREIGN KEY (proxy_hostid) REFERENCES hosts (hostid);
 ALTER TABLE hosts ADD CONSTRAINT c_hosts_2 FOREIGN KEY (maintenanceid) REFERENCES maintenances (maintenanceid);

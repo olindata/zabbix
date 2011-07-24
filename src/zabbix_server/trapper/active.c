@@ -130,29 +130,35 @@ static int	get_hostid_by_host(const char *host, const char *ip, unsigned short p
  * Author: Seh Hui Leong                                                      *
  *                                                                            *
  ******************************************************************************/
-int check_auth_session(zbx_uint64_t hostid, int *authenticated, char *error)
+int check_auth_session(zbx_uint64_t hostid, int *auth_enabled, int *authenticated, char *error)
 {
 	DB_RESULT	result;
 	DB_ROW		row;
 	int		lastaccess = -1;
 	int		ret = FAIL;
 
+	zabbix_log(LOG_LEVEL_DEBUG, "In check_auth_session(): id=" ZBX_FS_UI64, hostid);
+
 	result = DBselect(
-		"select lastaccess"
+		"select auth_enabled, lastaccess"
 		" from hosts"
 		" where hostid='%s' and status=%d",
 		hostid, HOST_STATUS_MONITORED);
 
 	if (NULL != (row = DBfetch(result)))
 	{
-		lastaccess = atoi(row[0]);
+		*auth_enabled = atoi(row[0]);
+		lastaccess = atoi(row[1]);
 		ret = SUCCEED;
 	}
 	else
-		*error = zbx_dsprintf(*error, "Host \"%d\" is not monitored or does not exist", hostid);
+		error = zbx_dsprintf(error, "Host \"%d\" is not monitored or does not exist", hostid);
 	DBfree_result(result);
 
-	if((int)(time(NULL)) < lastaccess + AUTH_SESSION_TIMEOUT) {
+	if(
+		(auth_enabled == 0) ||
+		((int)(time(NULL)) < lastaccess + AUTH_SESSION_TIMEOUT)
+	) {
 		*authenticated = 1;
 	} else {
 		*authenticated = 0;
@@ -179,29 +185,31 @@ int authenticate(zbx_uint64_t hostid, char *password, int *valid, char *error)
 {
 	DB_RESULT	result;
 	DB_ROW		row;
-	int		lastaccess;
+	int		auth_enabled = 0;
 	int		ret = FAIL;
 	const char	*stored_password;
 
+	zabbix_log(LOG_LEVEL_DEBUG, "In authenticate() id=" ZBX_FS_UI64, hostid);
+
 	result = DBselect(
-		"select auth_password"
+		"select auth_enabled, auth_password"
 		" from hosts"
 		" where hostid='%s' and status=%d",
 		hostid, HOST_STATUS_MONITORED);
 
 	if (NULL != (row = DBfetch(result)))
 	{
-		lastaccess = atoi(row[0]);
+		auth_enabled = atoi(row[0]);
+		stored_password = row[1];
 		ret = SUCCEED;
 	}
 	else
-		*error = zbx_dsprintf(*error, "Host \"%d\" is not monitored or does not exist", hostid);
+		error = zbx_dsprintf(error, "Host \"%d\" is not monitored or does not exist", hostid);
 	DBfree_result(result);
 
-	if(SUCCEED == DBis_null(row[0])) {
+	if(auth_enabled == 0) {
 		*valid = 1;
 	} else {
-		stored_password = row[0];
 		*valid = (0 == strcmp(password, stored_password)) ? 1 : 0;
 	}
 
@@ -224,6 +232,8 @@ int authenticate(zbx_uint64_t hostid, char *password, int *valid, char *error)
  ******************************************************************************/
 void update_auth_session(zbx_uint64_t hostid, char *error)
 {
+	zabbix_log(LOG_LEVEL_DEBUG, "In update_auth_session(): id=" ZBX_FS_UI64, hostid);
+
 	DBexecute("update hosts set lastaccess=%d where hostid=" ZBX_FS_UI64, time(NULL), hostid);
 }
 
@@ -389,6 +399,7 @@ int	send_list_of_active_checks_json(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	char		error[MAX_STRING_LEN], *key;
 	DC_ITEM		dc_item;
 	unsigned short	port;
+	int		auth_enabled = 0;
 	int		auth = 0;
 	int		valid_password = 0;
 
@@ -423,7 +434,7 @@ int	send_list_of_active_checks_json(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	if (FAIL == get_hostid_by_host(host, ip, port, &hostid, error))
 		goto error;
 
-	if (FAIL == check_auth_session(hostid, &auth, error))
+	if (FAIL == check_auth_session(hostid, &auth_enabled, &auth, error))
 		goto error;
 	if (auth != 1) {
 		if (FAIL == authenticate(hostid, password, &valid_password, error))
@@ -432,7 +443,7 @@ int	send_list_of_active_checks_json(zbx_sock_t *sock, struct zbx_json_parse *jp)
 		if(valid_password != 1) {
 			zabbix_log(LOG_LEVEL_WARNING, "Host authentication from [%s] failed",
 					get_ip_by_socket(sock));
-			*error = zbx_dsprintf(*error, "Authentication required");
+			zbx_snprintf(error, MAX_STRING_LEN, "Authentication required");
 			goto error;
 		}
 	}
@@ -592,7 +603,7 @@ int	send_list_of_active_checks_json(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	zbx_json_free(&json);
 	zbx_free(sql);
 
-	if(res == SUCCEED) {
+	if((res == SUCCEED) && (auth_enabled == 1)) {
 		update_auth_session(hostid, error);
 	}
 	return res;
@@ -603,7 +614,7 @@ error:
 	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
 	zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_FAILED, ZBX_JSON_TYPE_STRING);
 	zbx_json_addstring(&json, ZBX_PROTO_TAG_INFO, error, ZBX_JSON_TYPE_STRING);
-	zbx_json_addstring(&json, ZBX_PROTO_TAG_AUTH_REQUIRED, (auth != 1) ? 1 : 0, ZBX_JSON_TYPE_INT);
+	zbx_json_addstring(&json, ZBX_PROTO_TAG_AUTH_REQUIRED, (auth != 1) ? "1" : "0", ZBX_JSON_TYPE_INT);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "Sending [%s]",
 			json.buffer);

@@ -32,7 +32,7 @@ $ipmi_username	= get_request('ipmi_username', '');
 $ipmi_password	= get_request('ipmi_password', '');
 $profile_mode	= get_request('profile_mode', HOST_PROFILE_DISABLED);
 $host_profile = get_request('host_profile', array());
-$auth_enabled = get_request('auth_enabled', 1);
+$auth_enabled = get_request('auth_enabled', 0);
 $auth_password = get_request('auth_password', '');
 
 
@@ -248,13 +248,13 @@ if($profile_mode != HOST_PROFILE_DISABLED){
 }
 
 $frmHost->addRow(array(
-	new CVisibilityBox('visible[auth_enabled]', isset($visible['auth_enabled']), 'auth_enabled', S_ORIGINAL), S_AUTH_ENABLED),
-    new CCheckBox('auth_enabled', 'yes', null, $auth_enabled)
+	new CVisibilityBox('visible[auth_enabled]', isset($visible['auth_enabled']), 'auth_enabled', S_ORIGINAL), S_AUTHENTICATION.SPACE.S_ENABLED),
+    new CCheckBox('auth_enabled', $auth_enabled, null, 1)
 );
 
 $frmHost->addRow(array(
 	new CVisibilityBox('visible[auth_password]', isset($visible['auth_password']), 'auth_password', S_ORIGINAL), S_PASSWORD),
-	new CPassBox('auth_password', $auth_password)
+	new CTextBox('auth_password', $auth_password)
 );
 
 $frmHost->addItemToBottomRow(new CSubmit('masssave',S_SAVE));

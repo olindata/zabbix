@@ -39,7 +39,7 @@
 	$visiblename= get_request('visiblename',	'');
 	$status		= get_request('status',	HOST_STATUS_MONITORED);
 	$proxy_hostid	= get_request('proxy_hostid','');
-    $auth_enabled = get_request('auth_enabled');
+    $auth_enabled = get_request('auth_enabled', 0);
     $auth_password = get_request('auth_password', '');
 
 	$ipmi_authtype	= get_request('ipmi_authtype',-1);
@@ -121,6 +121,10 @@
 		$ipmi_privilege		= $dbHost['ipmi_privilege'];
 		$ipmi_username		= $dbHost['ipmi_username'];
 		$ipmi_password		= $dbHost['ipmi_password'];
+
+        if($auth_enabled == 0) {
+            $auth_password = '';
+        }
 
 		$macros = $dbHost['macros'];
 		$interfaces = $dbHost['interfaces'];
@@ -236,9 +240,19 @@
 
 // Authentication
 	$hostList->addRow(_('Status'),$cmbStatus);
-    //TODO: Add script to disable the password field?
-    $hostList->addRow(S_AUTHENTICATION.SPACE.S_ENABLED, new CCheckBox('auth_enabled', ($auth_enabled == 0 ? 'no' : 'yes'), null));
-    $hostList->addRow(S_PASSWORD, new CTextBox('auth_password', $auth_password));
+
+    $script = "javascript:
+        var authPassword = document.getElementById('auth_password');
+        if(this.checked) authPassword.disabled = false;
+        else authPassword.disabled = true;";
+
+    $authEnabledCheckBox = new CCheckBox('auth_enabled', $auth_enabled, $script, 1);
+    $authPasswordTextBox = new CTextBox('auth_password', $auth_password);
+    if($auth_enabled == 0) {
+        $authPasswordTextBox->setAttribute('disabled', 'disabled');
+    }
+    $hostList->addRow(S_AUTHENTICATION.SPACE.S_ENABLED, $authEnabledCheckBox);
+    $hostList->addRow(S_PASSWORD, $authPasswordTextBox);
 
 	if($_REQUEST['form'] == 'full_clone'){
 		// host items
