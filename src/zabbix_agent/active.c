@@ -443,6 +443,8 @@ static int	check_response(char *response)
 		if (SUCCEED == auth_parsed && 1 == atoi(value)) {
 			authenticated = 0;
 		}
+	} else {
+		authenticated = 1;
 	}
 
 	if (SUCCEED == ret && SUCCEED == zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_INFO, info, sizeof(info)))

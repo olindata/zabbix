@@ -142,7 +142,7 @@ int check_auth_session(zbx_uint64_t hostid, int *auth_enabled, int *authenticate
 	result = DBselect(
 		"select auth_enabled, lastaccess"
 		" from hosts"
-		" where hostid='%s' and status=%d",
+		" where hostid=" ZBX_FS_UI64 " and status=%d",
 		hostid, HOST_STATUS_MONITORED);
 
 	if (NULL != (row = DBfetch(result)))
@@ -152,7 +152,7 @@ int check_auth_session(zbx_uint64_t hostid, int *auth_enabled, int *authenticate
 		ret = SUCCEED;
 	}
 	else
-		error = zbx_dsprintf(error, "Host \"%d\" is not monitored or does not exist", hostid);
+		error = zbx_dsprintf(error, "Host " ZBX_FS_UI64 " is not monitored or does not exist", hostid);
 	DBfree_result(result);
 
 	if(
@@ -194,7 +194,7 @@ int authenticate(zbx_uint64_t hostid, char *password, int *valid, char *error)
 	result = DBselect(
 		"select auth_enabled, auth_password"
 		" from hosts"
-		" where hostid='%s' and status=%d",
+		" where hostid=" ZBX_FS_UI64 " and status=%d",
 		hostid, HOST_STATUS_MONITORED);
 
 	if (NULL != (row = DBfetch(result)))
@@ -204,7 +204,7 @@ int authenticate(zbx_uint64_t hostid, char *password, int *valid, char *error)
 		ret = SUCCEED;
 	}
 	else
-		error = zbx_dsprintf(error, "Host \"%d\" is not monitored or does not exist", hostid);
+		error = zbx_dsprintf(error, "Host " ZBX_FS_UI64 " is not monitored or does not exist", hostid);
 	DBfree_result(result);
 
 	if(auth_enabled == 0) {
