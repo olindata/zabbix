@@ -26,7 +26,6 @@
 #include "active.h"
 
 extern unsigned char	daemon_type;
-int		AUTH_SESSION_TIMEOUT = 360; // Authentication session timeout
 
 /******************************************************************************
  *                                                                            *

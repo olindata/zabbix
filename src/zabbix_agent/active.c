@@ -743,6 +743,12 @@ static void	process_active_checks(char *server, unsigned short port)
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s('%s',%hu)", __function_name, server, port);
 
+	// Terminate immedialetly if the agent's not authenticated
+	if(authenticated == 0) {
+		zabbix_log(LOG_LEVEL_WARNING, "Not authenticated; stop processing");
+		goto ret;
+	}
+
 	init_result(&result);
 
 	now = (int)time(NULL);

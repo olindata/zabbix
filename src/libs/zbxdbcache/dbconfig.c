@@ -202,6 +202,8 @@ typedef struct
 	unsigned char	ipmi_available;
 	unsigned char	jmx_available;
 	unsigned char	status;
+	int		lastaccess;
+	int		auth_enabled;
 }
 ZBX_DC_HOST;
 
@@ -2267,6 +2269,7 @@ void	DCsync_configuration()
 				"errors_from,available,disable_until,snmp_errors_from,"
 				"snmp_available,snmp_disable_until,ipmi_errors_from,ipmi_available,"
 				"ipmi_disable_until,jmx_errors_from,jmx_available,jmx_disable_until,"
+				"lastaccess,auth_enabled,"
 				"status,name"
 			" from hosts"
 			" where status in (%d,%d,%d)"
@@ -2861,6 +2864,8 @@ static void	DCget_host(DC_HOST *dst_host, const ZBX_DC_HOST *src_host)
 	dst_host->jmx_errors_from = src_host->jmx_errors_from;
 	dst_host->jmx_available = src_host->jmx_available;
 	dst_host->jmx_disable_until = src_host->jmx_disable_until;
+	dst_host->lastaccess = src_host->lastaccess;
+	dst_host->auth_enabled = src_host->auth_enabled;
 
 	if (NULL != (ipmihost = zbx_hashset_search(&config->ipmihosts, &src_host->hostid)))
 	{

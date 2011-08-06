@@ -678,6 +678,8 @@ zbx_script_t;
 
 #define	GET_SENDER_TIMEOUT	60
 
+#define AUTH_SESSION_TIMEOUT	360
+
 #ifndef MAX
 #	define MAX(a, b) ((a) > (b) ? (a) : (b))
 #endif

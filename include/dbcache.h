@@ -92,6 +92,8 @@ typedef struct
 	int		jmx_errors_from;
 	unsigned char	jmx_available;
 	int		jmx_disable_until;
+	int		lastaccess;
+	int		auth_enabled;
 }
 DC_HOST;
 
