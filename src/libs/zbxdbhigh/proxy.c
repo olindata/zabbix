@@ -1401,10 +1401,6 @@ void	process_mass_data(zbx_sock_t *sock, zbx_uint64_t proxy_hostid,
 				item.host.maintenance_from <= values[i].ts.sec)
 			continue;
 
-		if (item.host.auth_enabled == 1 &&
-				(int)(time(NULL)) >= item.host.lastaccess + AUTH_SESSION_TIMEOUT)
-			continue;
-
 		if (ITEM_TYPE_INTERNAL == item.type || ITEM_TYPE_AGGREGATE == item.type || ITEM_TYPE_CALCULATED == item.type)
 			continue;
 

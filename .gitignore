@@ -2,6 +2,7 @@
 *.a
 *.o
 *.diff
+tags
 
 # Compilation files
 a.out.dSYM/
@@ -9,6 +10,7 @@ autom4te.cache/
 .deps
 Makefile
 Makefile.in
+WARNING
 WARNINGS
 aclocal.m4
 compile

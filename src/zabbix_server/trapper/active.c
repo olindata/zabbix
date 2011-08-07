@@ -129,7 +129,7 @@ static int	get_hostid_by_host(const char *host, const char *ip, unsigned short p
  * Author: Seh Hui Leong                                                      *
  *                                                                            *
  ******************************************************************************/
-int check_auth_session(zbx_uint64_t hostid, int *auth_enabled, int *authenticated, char *error)
+static int check_auth_session(zbx_uint64_t hostid, int *auth_enabled, int *authenticated, char *error)
 {
 	DB_RESULT	result;
 	DB_ROW		row;
@@ -180,7 +180,7 @@ int check_auth_session(zbx_uint64_t hostid, int *auth_enabled, int *authenticate
  * Author: Seh Hui Leong                                                      *
  *                                                                            *
  ******************************************************************************/
-int authenticate(zbx_uint64_t hostid, char *password, int *valid, char *error)
+static int authenticate(zbx_uint64_t hostid, char *password, int *valid, char *error)
 {
 	DB_RESULT	result;
 	DB_ROW		row;
@@ -229,7 +229,7 @@ int authenticate(zbx_uint64_t hostid, char *password, int *valid, char *error)
  * Author: Seh Hui Leong                                                      *
  *                                                                            *
  ******************************************************************************/
-void update_auth_session(zbx_uint64_t hostid, char *error)
+static void update_auth_session(zbx_uint64_t hostid)
 {
 	zabbix_log(LOG_LEVEL_DEBUG, "In update_auth_session(): id=" ZBX_FS_UI64, hostid);
 
@@ -603,7 +603,7 @@ int	send_list_of_active_checks_json(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	zbx_free(sql);
 
 	if((res == SUCCEED) && (auth_enabled == 1)) {
-		update_auth_session(hostid, error);
+		update_auth_session(hostid);
 	}
 	return res;
 error:
@@ -624,3 +624,80 @@ error:
 
 	return res;
 }
+
+/******************************************************************************
+ *                                                                            *
+ * Function: check_auth_session_by_host                                       *
+ *                                                                            *
+ * Purpose: Check whether the host has an authenticated session in the server *
+ *                                                                            *
+ * Parameters: jp            - [IN] The parsed JSON instance                  *
+ *             authenticated - [OUT] The host's authentication status         *
+ *             error         - [OUT] The error message should an error        *
+ *                                   occurred                                 *
+ *             max_error_len - [IN] The maximum error string length           *
+ *                                                                            *
+ * Return value:  SUCCEED - processed successfully                            *
+ *                FAIL - an error occurred                                    *
+ *                                                                            *
+ * Author: Seh Hui Leong                                                      *
+ *                                                                            *
+ * Comments:                                                                  *
+ *                                                                            *
+ ******************************************************************************/
+int	check_auth_session_by_host(struct zbx_json_parse *jp, int *authenticated, char *error, int max_error_len)
+{
+	DB_RESULT	result;
+	DB_ROW		row;
+	char		host[HOST_HOST_LEN_MAX];
+	char		*host_esc;
+	int		lastaccess = -1;
+	int		auth_enabled = 0;
+	int		ret = FAIL;
+
+	if (SUCCEED == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_HOST, host, HOST_HOST_LEN_MAX))
+	{
+		if (FAIL == zbx_check_hostname(host))
+		{
+			zbx_snprintf(error, max_error_len, "invalid host name [%s]", host);
+			return ret;
+		}
+
+		host_esc = DBdyn_escape_string(host);
+
+		result = DBselect(
+				"select auth_enabled, lastaccess"
+				" from hosts"
+				" where host='%s'"
+					" and status in (%d)"
+					DB_NODE,
+				host_esc, HOST_STATUS_MONITORED, DBnode_local("hostid"));
+
+		zbx_free(host_esc);
+
+		if (NULL != (row = DBfetch(result)))
+		{
+			auth_enabled = atoi(row[0]);
+			lastaccess = atoi(row[1]);
+			ret = SUCCEED;
+		}
+		else
+			zbx_snprintf(error, max_error_len, "host [%s] not found", host);
+
+		DBfree_result(result);
+
+		if(
+			(auth_enabled == 0) ||
+			((int)(time(NULL)) < lastaccess + AUTH_SESSION_TIMEOUT)
+		) {
+			*authenticated = 1;
+		} else {
+			*authenticated = 0;
+		}
+	}
+	else
+		zbx_snprintf(error, max_error_len, "missing name of host");
+
+	return ret;
+}
+

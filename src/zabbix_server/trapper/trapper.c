@@ -65,11 +65,23 @@ static void	recv_agenthistory(zbx_sock_t *sock, struct zbx_json_parse *jp)
 {
 	const char	*__function_name = "recv_agenthistory";
 	char		info[128];
+	int		authenticated;
+	char		error[MAX_STRING_LEN];
 	int		ret;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
 
-	ret = process_hist_data(sock, jp, 0, info, sizeof(info));
+	if (FAIL == (ret = check_auth_session_by_host(jp, &authenticated, error, MAX_STRING_LEN))) {
+		zabbix_log(LOG_LEVEL_WARNING, "History from active agent on [%s] failed: %s",
+				get_ip_by_socket(sock), error);
+	} else {
+		if (authenticated == 0) {
+			zabbix_log(LOG_LEVEL_WARNING, "Active agent [%s] is not authenticated",
+					get_ip_by_socket(sock));
+		} else {
+			ret = process_hist_data(sock, jp, 0, info, sizeof(info));
+		}
+	}
 
 	zbx_send_response(sock, ret, info, CONFIG_TIMEOUT);
 

@@ -500,6 +500,7 @@ static int	send_buffer(const char *host, unsigned short port)
 
 	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
 	zbx_json_addstring(&json, ZBX_PROTO_TAG_REQUEST, ZBX_PROTO_VALUE_AGENT_DATA, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(&json, ZBX_PROTO_TAG_HOST, CONFIG_HOSTNAME, ZBX_JSON_TYPE_STRING);
 	zbx_json_addarray(&json, ZBX_PROTO_TAG_DATA);
 
 	for (i = 0; i < buffer.count; i++)
@@ -743,7 +744,7 @@ static void	process_active_checks(char *server, unsigned short port)
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s('%s',%hu)", __function_name, server, port);
 
-	// Terminate immedialetly if the agent's not authenticated
+	/* Terminate immedialetly if the agent's not authenticated */
 	if(authenticated == 0) {
 		zabbix_log(LOG_LEVEL_WARNING, "Not authenticated; stop processing");
 		goto ret;
