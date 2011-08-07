@@ -442,7 +442,7 @@ int	send_list_of_active_checks_json(zbx_sock_t *sock, struct zbx_json_parse *jp)
         if (FAIL == check_auth_session(hostid, &auth_enabled, &auth, error))
                 goto error;
 
-	if (auth != 1 || has_password == 1) {
+	if (auth_enabled == 1 && (auth != 1 || has_password == 1)) {
 		if (FAIL == authenticate(hostid, password, &valid_password, error)) {
 			zabbix_log(LOG_LEVEL_WARNING, "Host authentication from [%s] failed",
 					get_ip_by_socket(sock));
@@ -612,7 +612,7 @@ int	send_list_of_active_checks_json(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	zbx_json_free(&json);
 	zbx_free(sql);
 
-	if((res == SUCCEED) && (auth_enabled == 1)) {
+	if(res == SUCCEED && auth_enabled == 1) {
 		update_auth_session(hostid);
 	}
 	return res;
