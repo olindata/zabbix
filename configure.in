@@ -884,6 +884,7 @@ have_snmp="no"
 have_ipmi="no"
 have_ipv6="no"
 have_ssh2="no"
+have_gsasl="no"
 
 if test "$ipv6" = "yes"; then
 	AC_DEFINE(HAVE_IPV6,1,[Define to 1 if IPv6 should be enabled.])
@@ -1221,6 +1222,19 @@ fi
 CFLAGS="$CFLAGS $ICONV_CFLAGS"
 LDFLAGS="$LDFLAGS $ICONV_LDFLAGS"
 LIBS="$LIBS $ICONV_LIBS"
+
+dnl Check for libgsasl [by default - skip]
+LIBGSASL_CHECK_CONFIG()
+if test "x$want_gsasl" = "xyes"; then
+  if test "x$found_gsasl" != "xyes"; then
+    AC_MSG_ERROR([GSASL library not found])
+  else
+    have_gsasl="yes"
+  fi
+fi
+CFLAGS="${CFLAGS} ${GSASL_CPPFLAGS}"
+LDFLAGS="${LDFLAGS} ${GSASL_LDFLAGS}"
+LIBS="${LIBS} ${GSASL_LIBS}"
 
 RANLIB="ranlib"
 AC_SUBST(RANLIB)
