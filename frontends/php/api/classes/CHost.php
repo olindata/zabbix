@@ -1552,12 +1552,15 @@ class CHost extends CZBXAPI {
 	 * @param int    $hosts ['ipmi_privilege'] IPMI privilege. OPTIONAL
 	 * @param string $hosts ['ipmi_username'] IPMI username. OPTIONAL
 	 * @param string $hosts ['ipmi_password'] IPMI password. OPTIONAL
+	 * @param int    $hosts ['auth_enabled'] Enable authentication. OPTIONAL
+	 * @param string $hosts ['auth_password'] Authentication password. OPTIONAL
 	 *
 	 * @return boolean
 	 */
 	public function create($hosts) {
 		$hosts = zbx_toArray($hosts);
 		$hostids = array();
+
 
 		$this->checkInput($hosts, __FUNCTION__);
 
@@ -1630,6 +1633,8 @@ class CHost extends CZBXAPI {
 	 * @param string $hosts ['ipmi_username'] IPMI username. OPTIONAL
 	 * @param string $hosts ['ipmi_password'] IPMI password. OPTIONAL
 	 * @param string $hosts ['groups'] groups
+	 * @param int    $hosts ['auth_enabled'] Enable authentication. OPTIONAL
+	 * @param string $hosts ['auth_password'] Authentication password. OPTIONAL
 	 *
 	 * @return boolean
 	 */
@@ -1769,6 +1774,8 @@ class CHost extends CZBXAPI {
 	 * @param int    $hosts ['fields']['ipmi_privilege'] IPMI privilege. OPTIONAL
 	 * @param string $hosts ['fields']['ipmi_username'] IPMI username. OPTIONAL
 	 * @param string $hosts ['fields']['ipmi_password'] IPMI password. OPTIONAL
+	 * @param int    $hosts ['fields']['auth_enabled'] Enable authentication. OPTIONAL
+	 * @param string $hosts ['fields']['auth_password'] Authentication password. OPTIONAL
 	 *
 	 * @return boolean
 	 */

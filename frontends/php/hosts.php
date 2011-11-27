@@ -49,6 +49,8 @@ $fields = array(
 	'groupid' =>			array(T_ZBX_INT, O_OPT, P_SYS,			DB_ID,		null),
 	'hostid' =>				array(T_ZBX_INT, O_OPT, P_SYS,			DB_ID,		'isset({form})&&({form}=="update")'),
 	'host' =>				array(T_ZBX_STR, O_OPT, null,			NOT_EMPTY,	'isset({save})', _('Host name')),
+	'auth_enabled'=>		array(T_ZBX_INT, O_OPT, null,			null,		null),
+	'auth_password'=>		array(T_ZBX_STR, O_OPT, null,			null,		null),
 	'visiblename' =>		array(T_ZBX_STR, O_OPT, null,			null,		'isset({save})'),
 	'proxy_hostid' =>		array(T_ZBX_INT, O_OPT, P_SYS,			DB_ID,		'isset({save})'),
 	'status' =>				array(T_ZBX_INT, O_OPT, null,			IN('0,1,3'), 'isset({save})'),
@@ -213,12 +215,25 @@ elseif (isset($_REQUEST['go']) && $_REQUEST['go'] == 'massupdate' && isset($_REQ
 
 		$hosts = array('hosts' => zbx_toObject($hostids, 'hostid'));
 
-		$properties = array('proxy_hostid', 'ipmi_authtype', 'ipmi_privilege', 'ipmi_username', 'ipmi_password', 'status');
+		$properties = array('proxy_hostid', 'ipmi_authtype', 'ipmi_privilege', 'ipmi_username', 'ipmi_password', 'status', 'auth_enabled', 'auth_password');
 		$new_values = array();
 		foreach ($properties as $property) {
 			if (isset($visible[$property])) {
+				if($property == 'auth_enabled') {
+					$_REQUEST['auth_enabled'] = get_request('auth_enabled', 0);
+				}
+
 				$new_values[$property] = $_REQUEST[$property];
 			}
+		}
+		if(in_array('auth_enabled', $new_values)) {
+			// Disabling authentication will override mass updating passwords
+			if($new_values['auth_enabled'] == 0) {
+				$new_values['auth_password'] = '';
+			}
+		} else if(in_array('auth_password', $new_values)) {
+			// Enable the auth_enabled flag if it's not set yet
+			$new_values['auth_enabled'] == 1;
 		}
 
 		if (isset($visible['inventory_mode'])) {
@@ -398,8 +413,13 @@ elseif (isset($_REQUEST['save'])) {
 			'interfaces' => $interfaces,
 			'macros' => $macros,
 			'inventory' => (get_request('inventory_mode') != HOST_INVENTORY_DISABLED) ? get_request('host_inventory', array()) : array(),
-			'inventory_mode' => get_request('inventory_mode')
+			'inventory_mode' => get_request('inventory_mode'),
+			'auth_enabled' => get_request('auth_enabled', 0),
+			'auth_password' => get_request('auth_password'),
 		);
+		if($host['auth_enabled'] == 0) {
+			$host['auth_password'] = '';
+		}
 
 		if ($create_new) {
 			$hostids = API::Host()->create($host);

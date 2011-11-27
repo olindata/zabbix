@@ -18,7 +18,6 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-
 require_once dirname(__FILE__).'/js/configuration.host.edit.js.php';
 
 // create form
@@ -204,6 +203,20 @@ if ($this->data['inventory_mode'] != HOST_INVENTORY_DISABLED) {
 	}
 }
 
+$hostForm->addRow(array(
+	new CVisibilityBox('visible[auth_enabled]', isset($this->data['visible']['auth_enabled']), 'auth_enabled', _('Original')), _('Authentication enabled')),
+	new CCheckBox('auth_enabled', $this->data['auth_enabled'], null, 1)
+);
+
+$hostForm->addRow(array(
+	new CVisibilityBox('visible[auth_password]', isset($visible['auth_password']), 'auth_password', _('Original')), _('Password')),
+	new CTextBox('auth_password', $this->data['auth_password'])
+);
+
+$hostForm->addItemToBottomRow(new CSubmit('masssave', _('Save')));
+$hostForm->addItemToBottomRow(SPACE);
+$hostForm->addItemToBottomRow(new CButtonCancel(url_param('config').url_param('groupid')));
+
 // append tabs to form
 $hostTab = new CTabView();
 $hostTab->addTab('hostTab', _('Mass update'), $hostFormList);
@@ -213,3 +226,4 @@ $hostForm->addItem($hostTab);
 $hostForm->addItem(makeFormFooter(new CSubmit('masssave', _('Update')), new CButtonCancel(url_param('groupid'))));
 
 return $hostForm;
+?>

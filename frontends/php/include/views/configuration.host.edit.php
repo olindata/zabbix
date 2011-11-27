@@ -36,6 +36,8 @@ $host = get_request('host', '');
 $visiblename = get_request('visiblename', '');
 $status = get_request('status', HOST_STATUS_MONITORED);
 $proxy_hostid = get_request('proxy_hostid', '');
+$auth_enabled = get_request('auth_enabled', 0);
+$auth_password = get_request('auth_password', '');
 $ipmi_authtype = get_request('ipmi_authtype', -1);
 $ipmi_privilege = get_request('ipmi_privilege', 2);
 $ipmi_username = get_request('ipmi_username', '');
@@ -111,11 +113,16 @@ if ($_REQUEST['hostid'] > 0 && !isset($_REQUEST['form_refresh'])) {
 		$visiblename = '';
 	}
 	$status = $dbHost['status'];
+	$auth_enabled = $dbHost['auth_enabled'];
+	$auth_password = $dbHost['auth_password'];
 
 	$ipmi_authtype = $dbHost['ipmi_authtype'];
 	$ipmi_privilege = $dbHost['ipmi_privilege'];
 	$ipmi_username = $dbHost['ipmi_username'];
 	$ipmi_password = $dbHost['ipmi_password'];
+	if ($auth_enabled == 0) {
+		$auth_password = '';
+	}
 
 	$macros = order_macros($dbHost['macros'], 'macro');
 	$host_groups = zbx_objectValues($dbHost['groups'], 'groupid');
@@ -296,6 +303,20 @@ $cmbStatus->addItem(HOST_STATUS_MONITORED, _('Monitored'));
 $cmbStatus->addItem(HOST_STATUS_NOT_MONITORED, _('Not monitored'));
 
 $hostList->addRow(_('Status'), $cmbStatus);
+
+// Authentication
+$script = "javascript:
+	var authPassword = document.getElementById('auth_password');
+	if(this.checked) authPassword.disabled = false;
+	else authPassword.disabled = true;";
+
+$authEnabledCheckBox = new CCheckBox('auth_enabled', $auth_enabled, $script, 1);
+$authPasswordTextBox = new CTextBox('auth_password', $auth_password);
+if($auth_enabled == 0) {
+	$authPasswordTextBox->setAttribute('disabled', 'disabled');
+}
+$hostList->addRow(_('Authentication enabled'), $authEnabledCheckBox);
+$hostList->addRow(_('Password'), $authPasswordTextBox);
 
 if ($_REQUEST['form'] == 'full_clone') {
 	// host items
