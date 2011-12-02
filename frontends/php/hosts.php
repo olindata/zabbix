@@ -229,7 +229,17 @@ elseif (isset($_REQUEST['go']) && $_REQUEST['go'] == 'massupdate' && isset($_REQ
 		if(in_array('auth_enabled', $new_values)) {
 			// Disabling authentication will override mass updating passwords
 			if($new_values['auth_enabled'] == 0) {
-				$new_values['auth_password'] = '';
+				$new_values['auth_password'] = null;
+			}
+		} else if(in_array('auth_password', $new_values)) {
+			// Enable the auth_enabled flag if it's not set yet
+			$new_values['auth_enabled'] == 1;
+		}
+
+		if(in_array('auth_enabled', $new_values)) {
+			// Disabling authentication will override mass updating passwords
+			if($new_values['auth_enabled'] == 0) {
+				$new_values['auth_password'] = null;
 			}
 		} else if(in_array('auth_password', $new_values)) {
 			// Enable the auth_enabled flag if it's not set yet
@@ -418,7 +428,7 @@ elseif (isset($_REQUEST['save'])) {
 			'auth_password' => get_request('auth_password'),
 		);
 		if($host['auth_enabled'] == 0) {
-			$host['auth_password'] = '';
+			$host['auth_password'] = null;
 		}
 
 		if ($create_new) {

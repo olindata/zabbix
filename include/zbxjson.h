@@ -63,6 +63,7 @@
 #define ZBX_PROTO_TAG_JMX_ERROR		"jmx_error"
 #define ZBX_PROTO_TAG_USERNAME		"username"
 #define ZBX_PROTO_TAG_PASSWORD		"password"
+#define ZBX_PROTO_TAG_AUTH_REQUIRED		"auth_required"
 
 #define ZBX_PROTO_VALUE_FAILED		"failed"
 #define ZBX_PROTO_VALUE_SUCCESS		"success"
