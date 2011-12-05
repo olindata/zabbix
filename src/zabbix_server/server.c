@@ -26,6 +26,7 @@
 #include "log.h"
 #include "zbxgetopt.h"
 #include "mutexs.h"
+#include "zbxauthcache.h"
 
 #include "sysinfo.h"
 #include "zbxserver.h"
@@ -542,6 +543,10 @@ int	MAIN_ZABBIX_ENTRY()
 	zbx_create_sqlite3_mutex(CONFIG_DBNAME);
 #endif
 
+#ifdef	HAVE_GSASL
+	init_auth_cache();
+#endif
+
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
 
 	if (0 != CONFIG_NODEID)
@@ -795,6 +800,10 @@ void	zbx_on_exit()
 
 #ifdef HAVE_SQLITE3
 	zbx_remove_sqlite3_mutex();
+#endif
+
+#ifdef HAVE_GSASL
+	free_auth_cache();
 #endif
 
 	free_selfmon_collector();
