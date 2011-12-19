@@ -63,10 +63,12 @@
 #define ZBX_PROTO_TAG_JMX_ERROR		"jmx_error"
 #define ZBX_PROTO_TAG_USERNAME		"username"
 #define ZBX_PROTO_TAG_PASSWORD		"password"
-#define ZBX_PROTO_TAG_AUTH_REQUIRED		"auth_required"
+#define ZBX_PROTO_TAG_NONCE		"nonce"
+#define ZBX_PROTO_TAG_CLIENT_PROOF	"client_proof"
 
 #define ZBX_PROTO_VALUE_FAILED		"failed"
 #define ZBX_PROTO_VALUE_SUCCESS		"success"
+#define ZBX_PROTO_VALUE_AUTHENTICATION_REQUIRED	"authentication_required"
 
 #define ZBX_PROTO_VALUE_GET_ACTIVE_CHECKS	"active checks"
 #define ZBX_PROTO_VALUE_PROXY_CONFIG		"proxy config"
@@ -80,6 +82,8 @@
 #define ZBX_PROTO_VALUE_COMMAND			"command"
 #define ZBX_PROTO_VALUE_JAVA_GATEWAY_INTERNAL	"java gateway internal"
 #define ZBX_PROTO_VALUE_JAVA_GATEWAY_JMX	"java gateway jmx"
+#define ZBX_PROTO_VALUE_AUTHENTICATE_HANDSHAKE	"authenticate handshake"
+#define ZBX_PROTO_VALUE_AUTHENTICATE		"authenticate"
 
 typedef enum
 {

@@ -1,5 +1,8 @@
 #include "zbxauthcache.h"
 
+static Gsasl		*ctx = NULL;
+static const char	*mech =	"SCRAM-SHA-1";
+
 /******************************************************************************
  *                                                                            *
  * Function: init_auth_cache                                                  *
@@ -9,8 +12,15 @@
  * Author: Seh Hui Leong                                                      *
  *                                                                            *
  ******************************************************************************/
-void	init_auth_cache()
+int	init_auth_cache()
 {
+	int	rc;
+
+	if((rc = gsasl_init(&ctx)) != GSASL_OK) {
+		return FAIL;
+	}
+
+	return SUCCEED;
 }
 
 /******************************************************************************
@@ -24,6 +34,7 @@ void	init_auth_cache()
  ******************************************************************************/
 void	free_auth_cache()
 {
+	gsasl_done(ctx);
 }
 
 /******************************************************************************
