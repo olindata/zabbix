@@ -3,6 +3,30 @@
 static Gsasl		*ctx = NULL;
 static const char	*mech =	"SCRAM-SHA-1";
 
+#define	LOCK_AUTH_CACHE		zbx_mutex_lock(&auth_cache_lock)
+#define	UNLOCK_AUTHCACHE	zbx_mutex_unlock(&auth_cache_lock)
+
+static ZBX_MUTEX	auth_cache_lock;
+static zbx_hashset_t	auth_sessions;
+
+typedef enum {
+	NOT_AUTH = 0,
+	HANDSHAKE,
+	AUTHENTICATED,
+	FAILED		/* 4 */
+
+}
+ZBX_AC_AUTH_STATE;
+
+typedef struct {
+	zbx_uint64_t	hostid;
+	Gsasl_session	*session;
+	ZBX_AC_AUTH_STATE authenticated;
+	int		last_access;
+	int		timeout;
+}
+ZBX_AC_SESSION;
+
 /******************************************************************************
  *                                                                            *
  * Function: init_auth_cache                                                  *
@@ -19,6 +43,12 @@ int	init_auth_cache()
 	if((rc = gsasl_init(&ctx)) != GSASL_OK) {
 		return FAIL;
 	}
+#define	INIT_HASHSET_SIZE	1000	/* should be calculated dynamically based on trends size? */
+
+	zbx_hashset_create(&auth_sessions, INIT_HASHSET_SIZE,
+			ZBX_DEFAULT_UINT64_HASH_FUNC, ZBX_DEFAULT_UINT64_COMPARE_FUNC);
+
+#undef	INIT_HASHSET_SIZE
 
 	return SUCCEED;
 }
@@ -34,45 +64,59 @@ int	init_auth_cache()
  ******************************************************************************/
 void	free_auth_cache()
 {
+	/**
+	 * TODO: I may need to iterate this through and free up all the GSASL
+	 * sessions.
+	 */
+	zbx_hashset_destroy(&auth_sessions);
 	gsasl_done(ctx);
 }
 
 /******************************************************************************
  *                                                                            *
- * Function: get_auth_session                                                 *
+ * Function: init_session                                                     *
  *                                                                            *
- * Purpose: Gets the host's authentication session object.                    *
+ * Purpose: Initializes the client's authentication session.                  *
  *                                                                            *
- * Parameters: hostid - The host id                                           *
+ * Parameters: hostid - [IN] The host id                                      *
+ *             handshake_msg - [IN] The handshake message from the client.    *
+ *             challenge - [OUT] The challenge issued from the server.        *
  *                                                                            *
- * Return value: pointer to a GSASL session structure                         *
+ * Return value: SUCCEED - An authentication session is initiated             *
+ *               FAIL - An error occurred or the session cannot be initiated  *
  *                                                                            *
  * Author: Seh Hui Leong                                                      *
  *                                                                            *
  ******************************************************************************/
-Gsasl_session *get_auth_session(zbx_uint64_t hostid)
+int	init_session(zbx_uint64_t hostid, char *handshake_msg, char *challenge)
 {
-    return NULL;
+	return NULL;
 }
 
 /******************************************************************************
  *                                                                            *
- * Function: set_auth_session                                                 *
+ * Function: authenticate                                                     *
  *                                                                            *
- * Purpose: Sets the host's authentication session object.                    *
+ * Purpose: Receives the client's response to the authentication challenge    *
+ *          and authenticate the client based on the password on the DB.      *
  *                                                                            *
- * Parameters: hostid - The host id                                           *
- *             session - The GSASL authentication session structure           *
+ * Parameters: hostid - [IN] The host id                                      *
+ *             challenge_resp - [IN] The client's response to the server's    *
+ *                              challenge                                     *
+ *             auth_status - [OUT] SUCCEED if the client is authenticated;    *
+ *                                 FAIL if the client failed the challenge.   *
+ *             auth_resp - [OUT] The server's response after authentication.  *
  *                                                                            *
- * Return value:  SUCCEED - session object is set                             *
+ * Return value:  SUCCEED - The client is authenticated.                      *
  *                FAIL - an error occurred or session object cannot be set    *
  *                                                                            *
  * Author: Seh Hui Leong                                                      *
  *                                                                            *
  ******************************************************************************/
-int	set_auth_session(zbx_uint64_t hostid, Gsasl_session *session)
+int	authenticate(zbx_uint64_t hostid, char *challenge_resp,
+		int *auth_status, char *auth_resp)
 {
-    return 0;
+	return 0;
 }
 
 /******************************************************************************
@@ -91,5 +135,5 @@ int	set_auth_session(zbx_uint64_t hostid, Gsasl_session *session)
  ******************************************************************************/
 int	check_auth_status(zbx_uint64_t hostid)
 {
-    return 0;
+	return 0;
 }
