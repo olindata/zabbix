@@ -1,4 +1,6 @@
+#include "mutexs.h"
 #include "zbxauthcache.h"
+#include "zbxalgo.h"
 
 static Gsasl		*ctx = NULL;
 static const char	*mech =	"SCRAM-SHA-1";
@@ -9,23 +11,18 @@ static const char	*mech =	"SCRAM-SHA-1";
 static ZBX_MUTEX	auth_cache_lock;
 static zbx_hashset_t	auth_sessions;
 
-typedef enum {
-	NOT_AUTH = 0,
-	HANDSHAKE,
-	AUTHENTICATED,
-	FAILED		/* 4 */
-
-}
-ZBX_AC_AUTH_STATE;
 
 typedef struct {
 	zbx_uint64_t	hostid;
 	Gsasl_session	*session;
-	ZBX_AC_AUTH_STATE authenticated;
+	zbx_auth_state_t auth_state;
+	int		auth_enabled;
 	int		last_access;
 	int		timeout;
 }
 ZBX_AC_SESSION;
+
+static ZBX_AC_SESSION *get_auth_session(zbx_uint64_t hostid);
 
 /******************************************************************************
  *                                                                            *
@@ -43,6 +40,7 @@ int	init_auth_cache()
 	if((rc = gsasl_init(&ctx)) != GSASL_OK) {
 		return FAIL;
 	}
+
 #define	INIT_HASHSET_SIZE	1000	/* should be calculated dynamically based on trends size? */
 
 	zbx_hashset_create(&auth_sessions, INIT_HASHSET_SIZE,
@@ -88,9 +86,40 @@ void	free_auth_cache()
  * Author: Seh Hui Leong                                                      *
  *                                                                            *
  ******************************************************************************/
-int	init_session(zbx_uint64_t hostid, char *handshake_msg, char *challenge)
+int	ACinit_session(zbx_uint64_t hostid, char *handshake_msg, char *challenge)
 {
-	return NULL;
+	ZBX_AC_SESSION	*session;
+	char		buf[BUFSIZ] = "";
+
+	/* TODO: Query the database to check whether the client supports 
+	 * authentication
+	 */
+	/* CODE */
+
+	/* If the user has a pre-existing session, reset the authentication
+	 * states
+	 */
+	session = get_auth_session(hostid);
+	if(
+		session->auth_state != AUTH_STATE_NOT_AUTH ||
+		session->auth_state != AUTH_STATE_FAILED
+	) {
+		session->auth_state = AUTH_STATE_NOT_AUTH;
+		gsasl_finish(session->session);
+	}
+
+	if(gsasl_server_start(ctx, mech, &session->session) != GSASL_OK) {
+		return FAIL;
+	}
+	if(gsasl_step64(session->session, handshake_msg, &buf) != GSASL_NEEDS_MORE) {
+		return FAIL;
+	}
+
+	/* Once a valid handshake is received, return a challenge */
+	session->auth_state = AUTH_STATE_HANDSHAKE;
+	challenge = buf;
+
+	return SUCCEED;
 }
 
 /******************************************************************************
@@ -103,8 +132,7 @@ int	init_session(zbx_uint64_t hostid, char *handshake_msg, char *challenge)
  * Parameters: hostid - [IN] The host id                                      *
  *             challenge_resp - [IN] The client's response to the server's    *
  *                              challenge                                     *
- *             auth_status - [OUT] SUCCEED if the client is authenticated;    *
- *                                 FAIL if the client failed the challenge.   *
+ *             auth_state - [OUT] The authentication state the host is in     *
  *             auth_resp - [OUT] The server's response after authentication.  *
  *                                                                            *
  * Return value:  SUCCEED - The client is authenticated.                      *
@@ -113,15 +141,45 @@ int	init_session(zbx_uint64_t hostid, char *handshake_msg, char *challenge)
  * Author: Seh Hui Leong                                                      *
  *                                                                            *
  ******************************************************************************/
-int	authenticate(zbx_uint64_t hostid, char *challenge_resp,
-		int *auth_status, char *auth_resp)
+int	ACauthenticate(zbx_uint64_t hostid, char *challenge_resp,
+		zbx_auth_state_t *auth_state, char *auth_resp)
 {
-	return 0;
+	ZBX_AC_SESSION	*session;
+	char		buf[BUFSIZ] = "";
+	char		password[BUFSIZ] = ""; /*TODO: Placeholder -- query this from database */
+
+	/* TODO: Query the database to check whether the client supports 
+	 * authentication + retrieve the password to check against
+	 */
+	/* CODE */
+
+	/* If the user has a pre-existing session, reset the authentication
+	 * states
+	 */
+	session = get_auth_session(hostid);
+	if(session->auth_state != AUTH_STATE_HANDSHAKE) {
+		return FAIL;
+	}
+
+	gsasl_property_set(session->session, GSASL_PASSWORD, password);
+	if(gsasl_step64(session->session, challenge_resp, &buf) != GSASL_OK) {
+		gsasl_finish(session->session);
+		session->auth_state = AUTH_STATE_FAILED;
+		return FAIL;
+	}
+
+	session->auth_state = AUTH_STATE_AUTHENTICATED;
+	/*
+	 * TODO: Fill in these fields
+	session->timeout = 0;
+	session->last_access = 0;
+	*/
+	return SUCCEED;
 }
 
 /******************************************************************************
  *                                                                            *
- * Function: check_auth_session                                               *
+ * Function: is_authenticated
  *                                                                            *
  * Purpose: Check whether the host is already authenticated.                  *
  *                                                                            *
@@ -133,7 +191,43 @@ int	authenticate(zbx_uint64_t hostid, char *challenge_resp,
  * Author: Seh Hui Leong                                                      *
  *                                                                            *
  ******************************************************************************/
-int	check_auth_status(zbx_uint64_t hostid)
+int	ACis_authenticated(zbx_uint64_t hostid)
 {
-	return 0;
+	ZBX_AC_SESSION	*session;
+
+	/* If the user has a pre-existing session, reset the authentication
+	 * states
+	 */
+	session = get_auth_session(hostid);
+
+	/* TODO: Check the timeout as well */
+	if(session->auth_state == AUTH_STATE_AUTHENTICATED) {
+		return SUCCEED;
+	} else {
+		return FAIL;
+	}
+}
+
+/******************************************************************************
+ *                                                                            *
+ * Function: get_auth_session                                                 *
+ *                                                                            *
+ * Purpose: find existing or add new structure and return pointer             *
+ *                                                                            *
+ * Return value: pointer to a authentication session structure                *
+ *                                                                            *
+ * Author: Seh Hui Leong                                                      *
+ *                                                                            *
+ ******************************************************************************/
+static ZBX_AC_SESSION *get_auth_session(zbx_uint64_t hostid)
+{
+	ZBX_AC_SESSION	*ptr, session;
+
+	if (NULL != (ptr = (ZBX_AC_SESSION *)zbx_hashset_search(&auth_sessions, &hostid)))
+		return ptr;
+
+	memset(&session, 0, sizeof(ZBX_AC_SESSION));
+	session.hostid = hostid;
+
+	return (ZBX_AC_SESSION *)zbx_hashset_insert(&auth_sessions, &session, sizeof(ZBX_AC_SESSION));
 }

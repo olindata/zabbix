@@ -757,6 +757,14 @@ typedef enum
 	HTTPTEST_AUTH_NTLM
 } zbx_httptest_auth_t;
 
+typedef enum {
+	AUTH_STATE_NOT_AUTH = 0,
+	AUTH_STATE_HANDSHAKE,
+	AUTH_STATE_AUTHENTICATED,
+	AUTH_STATE_FAILED
+}
+zbx_auth_state_t;
+
 #define ZBX_TASK_FLAG_MULTIPLE_AGENTS 0x01
 
 typedef struct
