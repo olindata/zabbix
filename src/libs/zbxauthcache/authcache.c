@@ -7,10 +7,10 @@ static const char	*mech =	"SCRAM-SHA-1";
 
 #define	LOCK_AUTH_CACHE		zbx_mutex_lock(&auth_cache_lock)
 #define	UNLOCK_AUTHCACHE	zbx_mutex_unlock(&auth_cache_lock)
+#define AUTH_SESSION_TIMEOUT	360  // in seconds
 
 static ZBX_MUTEX	auth_cache_lock;
 static zbx_hashset_t	auth_sessions;
-
 
 typedef struct {
 	zbx_uint64_t	hostid;
@@ -18,7 +18,6 @@ typedef struct {
 	zbx_auth_state_t auth_state;
 	int		auth_enabled;
 	int		last_access;
-	int		timeout;
 }
 ZBX_AC_SESSION;
 
@@ -62,10 +61,15 @@ int	init_auth_cache()
  ******************************************************************************/
 void	free_auth_cache()
 {
-	/**
-	 * TODO: I may need to iterate this through and free up all the GSASL
-	 * sessions.
-	 */
+	zbx_hashset_iter_t	iter;
+	ZBX_AC_SESSION		*session;
+
+	/* Clear off all session instances from memory */
+	zbx_hashset_iter_reset(&auth_sessions, &iter);
+	while (NULL != (session = (ZBX_AC_SESSION *)zbx_hashset_iter_next(&iter))) {
+		gsasl_finish(session->session);
+	}
+
 	zbx_hashset_destroy(&auth_sessions);
 	gsasl_done(ctx);
 }
@@ -90,11 +94,6 @@ int	ACinit_session(zbx_uint64_t hostid, char *handshake_msg, char *challenge)
 {
 	ZBX_AC_SESSION	*session;
 	char		buf[BUFSIZ] = "";
-
-	/* TODO: Query the database to check whether the client supports 
-	 * authentication
-	 */
-	/* CODE */
 
 	/* If the user has a pre-existing session, reset the authentication
 	 * states
@@ -130,6 +129,7 @@ int	ACinit_session(zbx_uint64_t hostid, char *handshake_msg, char *challenge)
  *          and authenticate the client based on the password on the DB.      *
  *                                                                            *
  * Parameters: hostid - [IN] The host id                                      *
+ *             stored password - [IN] The password stored in the server's DB  *
  *             challenge_resp - [IN] The client's response to the server's    *
  *                              challenge                                     *
  *             auth_state - [OUT] The authentication state the host is in     *
@@ -141,17 +141,11 @@ int	ACinit_session(zbx_uint64_t hostid, char *handshake_msg, char *challenge)
  * Author: Seh Hui Leong                                                      *
  *                                                                            *
  ******************************************************************************/
-int	ACauthenticate(zbx_uint64_t hostid, char *challenge_resp,
-		zbx_auth_state_t *auth_state, char *auth_resp)
+int	ACauthenticate(zbx_uint64_t hostid, char *stored_password,
+        char *challenge_resp, zbx_auth_state_t *auth_state, char *auth_resp)
 {
 	ZBX_AC_SESSION	*session;
 	char		buf[BUFSIZ] = "";
-	char		password[BUFSIZ] = ""; /*TODO: Placeholder -- query this from database */
-
-	/* TODO: Query the database to check whether the client supports 
-	 * authentication + retrieve the password to check against
-	 */
-	/* CODE */
 
 	/* If the user has a pre-existing session, reset the authentication
 	 * states
@@ -161,7 +155,7 @@ int	ACauthenticate(zbx_uint64_t hostid, char *challenge_resp,
 		return FAIL;
 	}
 
-	gsasl_property_set(session->session, GSASL_PASSWORD, password);
+	gsasl_property_set(session->session, GSASL_PASSWORD, stored_password);
 	if(gsasl_step64(session->session, challenge_resp, &buf) != GSASL_OK) {
 		gsasl_finish(session->session);
 		session->auth_state = AUTH_STATE_FAILED;
@@ -169,11 +163,8 @@ int	ACauthenticate(zbx_uint64_t hostid, char *challenge_resp,
 	}
 
 	session->auth_state = AUTH_STATE_AUTHENTICATED;
-	/*
-	 * TODO: Fill in these fields
-	session->timeout = 0;
-	session->last_access = 0;
-	*/
+	session->last_access = time(NULL);
+
 	return SUCCEED;
 }
 
@@ -201,7 +192,11 @@ int	ACis_authenticated(zbx_uint64_t hostid)
 	session = get_auth_session(hostid);
 
 	/* TODO: Check the timeout as well */
-	if(session->auth_state == AUTH_STATE_AUTHENTICATED) {
+	if(
+		session->auth_state == AUTH_STATE_AUTHENTICATED &&
+		(auth->last_access + AUTH_SESSION_TIMEOUT) > time(NULL)
+	) {
+		session->last_access = time(NULL);
 		return SUCCEED;
 	} else {
 		return FAIL;
