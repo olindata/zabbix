@@ -4,8 +4,8 @@
 #include "common.h"
 
 #ifdef HAVE_GSASL
-int	ACinit_auth_cache();
-void	ACfree_auth_cache();
+int	init_auth_cache();
+void	free_auth_cache();
 int	ACinit_session(zbx_uint64_t hostid, char *handshake_msg,
 		char *challenge);
 int	ACauthenticate(zbx_uint64_t hostid, char *stored_password,

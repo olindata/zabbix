@@ -1,3 +1,4 @@
+#include "log.h"
 #include "mutexs.h"
 #include "zbxauthcache.h"
 #include "zbxalgo.h"
@@ -6,7 +7,7 @@ static Gsasl		*ctx = NULL;
 static const char	*mech =	"SCRAM-SHA-1";
 
 #define	LOCK_AUTH_CACHE		zbx_mutex_lock(&auth_cache_lock)
-#define	UNLOCK_AUTHCACHE	zbx_mutex_unlock(&auth_cache_lock)
+#define	UNLOCK_AUTH_CACHE	zbx_mutex_unlock(&auth_cache_lock)
 #define AUTH_SESSION_TIMEOUT	360  // in seconds
 
 static ZBX_MUTEX	auth_cache_lock;
@@ -34,10 +35,17 @@ static ZBX_AC_SESSION *get_auth_session(zbx_uint64_t hostid);
  ******************************************************************************/
 int	init_auth_cache()
 {
-	int	rc;
+	const char	*__function_name = "ACinit_auth_cache";
+	int		rc;
 
 	if((rc = gsasl_init(&ctx)) != GSASL_OK) {
 		return FAIL;
+	}
+
+	if (ZBX_MUTEX_ERROR == zbx_mutex_create_force(&auth_cache_lock, ZBX_MUTEX_CACHE))
+	{
+		zbx_error("cannot create mutex for authentication cache");
+		exit(FAIL);
 	}
 
 #define	INIT_HASHSET_SIZE	1000	/* should be calculated dynamically based on trends size? */
@@ -47,6 +55,7 @@ int	init_auth_cache()
 
 #undef	INIT_HASHSET_SIZE
 
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
 	return SUCCEED;
 }
 
@@ -61,22 +70,30 @@ int	init_auth_cache()
  ******************************************************************************/
 void	free_auth_cache()
 {
+	const char		*__function_name = "ACfree_auth_cache";
 	zbx_hashset_iter_t	iter;
 	ZBX_AC_SESSION		*session;
+
+	LOCK_AUTH_CACHE;
 
 	/* Clear off all session instances from memory */
 	zbx_hashset_iter_reset(&auth_sessions, &iter);
 	while (NULL != (session = (ZBX_AC_SESSION *)zbx_hashset_iter_next(&iter))) {
 		gsasl_finish(session->session);
 	}
-
 	zbx_hashset_destroy(&auth_sessions);
+
+	UNLOCK_AUTH_CACHE;
+
+	zbx_mutex_destroy(&auth_cache_lock);
 	gsasl_done(ctx);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "End of %s()", __function_name);
 }
 
 /******************************************************************************
  *                                                                            *
- * Function: init_session                                                     *
+ * Function: ACinit_session                                                     *
  *                                                                            *
  * Purpose: Initializes the client's authentication session.                  *
  *                                                                            *
@@ -92,13 +109,19 @@ void	free_auth_cache()
  ******************************************************************************/
 int	ACinit_session(zbx_uint64_t hostid, char *handshake_msg, char *challenge)
 {
+	const char	*__function_name = "ACinit_session";
 	ZBX_AC_SESSION	*session;
 	char		buf[BUFSIZ] = "";
+
+	LOCK_AUTH_CACHE;
+
+	session = get_auth_session(hostid);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() hostid: " ZBX_FS_UI64 " state: %d", __function_name, hostid, session->auth_state);
 
 	/* If the user has a pre-existing session, reset the authentication
 	 * states
 	 */
-	session = get_auth_session(hostid);
 	if(
 		session->auth_state != AUTH_STATE_NOT_AUTH ||
 		session->auth_state != AUTH_STATE_FAILED
@@ -118,12 +141,14 @@ int	ACinit_session(zbx_uint64_t hostid, char *handshake_msg, char *challenge)
 	session->auth_state = AUTH_STATE_HANDSHAKE;
 	challenge = buf;
 
+	UNLOCK_AUTH_CACHE;
+
 	return SUCCEED;
 }
 
 /******************************************************************************
  *                                                                            *
- * Function: authenticate                                                     *
+ * Function: ACauthenticate                                                     *
  *                                                                            *
  * Purpose: Receives the client's response to the authentication challenge    *
  *          and authenticate the client based on the password on the DB.      *
@@ -144,13 +169,19 @@ int	ACinit_session(zbx_uint64_t hostid, char *handshake_msg, char *challenge)
 int	ACauthenticate(zbx_uint64_t hostid, char *stored_password,
         char *challenge_resp, zbx_auth_state_t *auth_state, char *auth_resp)
 {
+	const char	*__function_name = "ACauthenticate";
 	ZBX_AC_SESSION	*session;
 	char		buf[BUFSIZ] = "";
+
+	LOCK_AUTH_CACHE;
 
 	/* If the user has a pre-existing session, reset the authentication
 	 * states
 	 */
 	session = get_auth_session(hostid);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() hostid: " ZBX_FS_UI64 " state: %d", __function_name, hostid, session->auth_state);
+
 	if(session->auth_state != AUTH_STATE_HANDSHAKE) {
 		return FAIL;
 	}
@@ -165,12 +196,14 @@ int	ACauthenticate(zbx_uint64_t hostid, char *stored_password,
 	session->auth_state = AUTH_STATE_AUTHENTICATED;
 	session->last_access = time(NULL);
 
+	UNLOCK_AUTH_CACHE;
+
 	return SUCCEED;
 }
 
 /******************************************************************************
  *                                                                            *
- * Function: is_authenticated
+ * Function: ACis_authenticated
  *                                                                            *
  * Purpose: Check whether the host is already authenticated.                  *
  *                                                                            *
@@ -184,23 +217,29 @@ int	ACauthenticate(zbx_uint64_t hostid, char *stored_password,
  ******************************************************************************/
 int	ACis_authenticated(zbx_uint64_t hostid)
 {
+	const char	*__function_name = "ACauthenticate";
 	ZBX_AC_SESSION	*session;
+	int		res = FAIL;
 
 	/* If the user has a pre-existing session, reset the authentication
 	 * states
 	 */
 	session = get_auth_session(hostid);
 
+	zabbix_log(LOG_LEVEL_DEBUG,
+		"In %s() hostid: " ZBX_FS_UI64 " state: %d lastaccess: %d",
+		__function_name, hostid, session->auth_state, session->last_access);
+
 	/* TODO: Check the timeout as well */
 	if(
 		session->auth_state == AUTH_STATE_AUTHENTICATED &&
-		(auth->last_access + AUTH_SESSION_TIMEOUT) > time(NULL)
+		(session->last_access + AUTH_SESSION_TIMEOUT) > time(NULL)
 	) {
 		session->last_access = time(NULL);
-		return SUCCEED;
-	} else {
-		return FAIL;
+		res = SUCCEED;
 	}
+
+	return res;
 }
 
 /******************************************************************************
