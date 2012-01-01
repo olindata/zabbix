@@ -544,6 +544,10 @@ typedef enum
 #define HOST_AVAILABLE_TRUE	1
 #define HOST_AVAILABLE_FALSE	2
 
+/* host authentication enabled */
+#define HOST_AUTH_ENABLED	0
+#define HOST_AUTH_DISABLED	1
+
 /* trigger statuses */
 #define TRIGGER_STATUS_ENABLED	0
 #define TRIGGER_STATUS_DISABLED	1

@@ -20,6 +20,7 @@
 #include "common.h"
 #include "db.h"
 #include "dbcache.h"
+#include "zbxauthcache.h"
 #include "log.h"
 #include "zbxserver.h"
 
@@ -40,10 +41,10 @@ extern unsigned char	daemon_type;
  *                                                                            *
  * Author: Alexander Vladishev                                                *
  *                                                                            *
- * Comments:                                                                  *
- *                                                                            *
  ******************************************************************************/
-static int	get_hostid_by_host(const char *host, const char *ip, unsigned short port, zbx_uint64_t *hostid, char *error)
+static int	get_hostid_by_host(const char *host, const char *ip,
+		unsigned short port, zbx_uint64_t *hostid, int *auth_enabled,
+		char **auth_password, char *error)
 {
 	char		*host_esc, dns[INTERFACE_DNS_LEN_MAX];
 	DB_RESULT	result;
@@ -61,7 +62,7 @@ static int	get_hostid_by_host(const char *host, const char *ip, unsigned short p
 	host_esc = DBdyn_escape_string(host);
 
 	result = DBselect(
-			"select hostid,status"
+			"select hostid,status,auth_enabled,auth_password"
 			" from hosts"
 			" where host='%s'"
 				" and status in (%d,%d)"
@@ -77,6 +78,8 @@ static int	get_hostid_by_host(const char *host, const char *ip, unsigned short p
 		if (HOST_STATUS_MONITORED == atoi(row[1]))
 		{
 			ZBX_STR2UINT64(*hostid, row[0]);
+			*auth_enabled = atoi(row[2]);
+			*auth_password = row[3];
 			res = SUCCEED;
 		}
 		else
@@ -131,7 +134,7 @@ static int	get_hostid_by_host(const char *host, const char *ip, unsigned short p
  * Author: Seh Hui Leong                                                      *
  *                                                                            *
  ******************************************************************************/
-static int	send_error_json(char *function_name, zbx_sock_t *sock, char *error)
+static int	send_error_json(char *function_name, zbx_sock_t *sock, char *err_response, char *error)
 {
 	struct zbx_json	json;
 	int		res = FAIL;
@@ -140,7 +143,7 @@ static int	send_error_json(char *function_name, zbx_sock_t *sock, char *error)
 			function_name, get_ip_by_socket(sock), error);
 
 	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
-	zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_FAILED, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, err_response, ZBX_JSON_TYPE_STRING);
 	zbx_json_addstring(&json, ZBX_PROTO_TAG_INFO, error, ZBX_JSON_TYPE_STRING);
 
 	zabbix_log(LOG_LEVEL_DEBUG, "Sending [%s]",
@@ -178,10 +181,11 @@ int	send_list_of_active_checks(zbx_sock_t *sock, char *request)
 	DB_ROW		row;
 	char		*buffer = NULL;
 	size_t		buffer_alloc = 2 * ZBX_KIBIBYTE, buffer_offset = 0;
-	int		res = FAIL, refresh_unsupported;
+	int		res = FAIL, refresh_unsupported, auth_enabled, is_authenticated;
 	zbx_uint64_t	hostid;
 	char		error[MAX_STRING_LEN], ip[INTERFACE_IP_LEN_MAX];
 	DC_ITEM		dc_item;
+	char		*password;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In send_list_of_active_checks()");
 
@@ -200,8 +204,18 @@ int	send_list_of_active_checks(zbx_sock_t *sock, char *request)
 
 	strscpy(ip, get_ip_by_socket(sock));
 
-	if (FAIL == get_hostid_by_host(host, ip, ZBX_DEFAULT_AGENT_PORT, &hostid, error))
+	if (FAIL == get_hostid_by_host(host, ip, ZBX_DEFAULT_AGENT_PORT, &hostid, &auth_enabled, &password, error))
 		goto out;
+
+	if (HOST_AUTH_ENABLED == auth_enabled)
+	{
+		is_authenticated = ACis_authenticated(hostid);
+		if(SUCCEED != is_authenticated) {
+			/* NOTE: Authentication support for non-JSON packets is not available yet */
+			zbx_snprintf(error, MAX_STRING_LEN, "Authenticated required");
+			goto out;
+		}
+	}
 
 	buffer = zbx_malloc(buffer, buffer_alloc);
 
@@ -308,9 +322,10 @@ int	send_list_of_active_checks_json(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	DB_RESULT	result;
 	DB_ROW		row;
 	struct zbx_json	json;
-	int		res = FAIL, refresh_unsupported;
+	int		res = FAIL, refresh_unsupported, auth_enabled, is_authenticated;
 	zbx_uint64_t	hostid;
 	char		error[MAX_STRING_LEN], *key = NULL;
+	char		*password;
 	DC_ITEM		dc_item;
 	unsigned short	port;
 
@@ -326,7 +341,7 @@ int	send_list_of_active_checks_json(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	if (FAIL == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_HOST, host, sizeof(host)))
 	{
 		zbx_snprintf(error, MAX_STRING_LEN, "%s", zbx_json_strerror());
-		return send_error_json("list of active checks", sock, error);
+		return send_error_json("list of active checks", sock, ZBX_PROTO_VALUE_FAILED, error);
 	}
 
 	if (FAIL == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_IP, ip, sizeof(ip)))
@@ -338,8 +353,15 @@ int	send_list_of_active_checks_json(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	if (FAIL == is_ushort(tmp, &port))
 		port = ZBX_DEFAULT_AGENT_PORT;
 
-	if (FAIL == get_hostid_by_host(host, ip, port, &hostid, error))
-		return send_error_json("list of active checks", sock, error);
+	if (FAIL == get_hostid_by_host(host, ip, port, &hostid, &auth_enabled, &password, error))
+		return send_error_json("list of active checks", sock, ZBX_PROTO_VALUE_FAILED, error);
+
+	if (HOST_AUTH_ENABLED == auth_enabled)
+	{
+		is_authenticated = ACis_authenticated(hostid);
+		if(SUCCEED != is_authenticated)
+			return send_error_json("list of active checks", sock, ZBX_PROTO_VALUE_AUTHENTICATION_REQUIRED, error);
+	}
 
 	sql = zbx_malloc(sql, sql_alloc);
 
@@ -499,14 +521,33 @@ int	send_list_of_active_checks_json(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	return res;
 }
 
+/******************************************************************************
+ *                                                                            *
+ * Function: respond_authenticate_handshake                                   *
+ *                                                                            *
+ * Purpose: respond to the authentication handshake request                   *
+ *                                                                            *
+ * Parameters: sock - open socket of server-agent connection                  *
+ *             json - request buffer                                          *
+ *                                                                            *
+ * Return value:  SUCCEED - the authentication handshake request is responded *
+ *                          successfully                                      *
+ *                FAIL - an error occurred                                    *
+ *                                                                            *
+ * Author: Seh Hui Leong                                                      *
+ *                                                                            *
+ ******************************************************************************/
 int	respond_authenticate_handshake(zbx_sock_t *sock, struct zbx_json_parse *jp)
 {
 	char		host[HOST_HOST_LEN_MAX],
 			tmp[32],
 			ip[INTERFACE_IP_LEN_MAX],
-			error[MAX_STRING_LEN];
+			error[MAX_STRING_LEN],
+			client_auth_message[MAX_STRING_LEN],
+			*auth_challenge = NULL,
+			*password;
 	struct zbx_json	json;
-	int		res = FAIL;
+	int		res = FAIL, auth_enabled;
 	zbx_uint64_t	hostid;
 	unsigned short	port;
 
@@ -515,7 +556,7 @@ int	respond_authenticate_handshake(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	if (FAIL == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_HOST, host, sizeof(host)))
 	{
 		zbx_snprintf(error, MAX_STRING_LEN, "%s", zbx_json_strerror());
-		return send_error_json("authenticate handshake", sock, error);
+		return send_error_json("authenticate handshake", sock, ZBX_PROTO_VALUE_FAILED, error);
 	}
 
 	if (FAIL == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_IP, ip, sizeof(ip)))
@@ -527,33 +568,79 @@ int	respond_authenticate_handshake(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	if (FAIL == is_ushort(tmp, &port))
 		port = ZBX_DEFAULT_AGENT_PORT;
 
-	if (FAIL == get_hostid_by_host(host, ip, port, &hostid, error))
-		return send_error_json("authenticate handshake", sock, error);
+	if (FAIL == get_hostid_by_host(host, ip, port, &hostid, &auth_enabled, &password, error))
+		return send_error_json("authenticate handshake", sock, ZBX_PROTO_VALUE_FAILED, error);
 
-	//TODO:
-	//Check from auth cache whether the host is logged in
-	//1. logged in; Just send a authentication success packet
-	//2. not logged in: Retrieve nonce from client's JSON packet, create new GSASL session & start the dance; store it in cache once we're done
+	if (HOST_AUTH_ENABLED != auth_enabled)
+		return send_error_json("authenticate handshake", sock, ZBX_PROTO_VALUE_NOT_SUPPORTED, error);
+
+	/* Parse the client's first message and attempt to initialize the session */
+	if (FAIL == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_AUTH_MESSAGE, client_auth_message, sizeof(client_auth_message)))
+	{
+		zbx_snprintf(error, MAX_STRING_LEN, "%s", zbx_json_strerror());
+		return send_error_json("authenticate handshake", sock, ZBX_PROTO_VALUE_FAILED, error);
+	}
+
+	if (FAIL == ACinit_session(hostid, client_auth_message, auth_challenge))
+	{
+		zbx_snprintf(error, MAX_STRING_LEN, "%s", zbx_json_strerror());
+		return send_error_json("authenticate handshake", sock, ZBX_PROTO_VALUE_FAILED, error);
+	}
+
+	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
+	zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(&json, ZBX_PROTO_TAG_AUTH_MESSAGE, auth_challenge, ZBX_JSON_TYPE_STRING);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "Sending [%s]", json.buffer);
+
+	alarm(CONFIG_TIMEOUT);
+	if (SUCCEED != zbx_tcp_send(sock, json.buffer))
+		zbx_snprintf(error, MAX_STRING_LEN, "%s", zbx_tcp_strerror());
+	else
+		res = SUCCEED;
+	alarm(0);
+
+	zbx_json_free(&json);
+
 	return res;
 }
 
+/******************************************************************************
+ *                                                                            *
+ * Function: authenticate                                                     *
+ *                                                                            *
+ * Purpose: authenticate the requesting client                                *
+ *                                                                            *
+ * Parameters: sock - open socket of server-agent connection                  *
+ *             json - request buffer                                          *
+ *                                                                            *
+ * Return value:  SUCCEED - the client is authenticated successfully          *
+ *                FAIL - an error occurred                                    *
+ *                                                                            *
+ * Author: Seh Hui Leong                                                      *
+ *                                                                            *
+ ******************************************************************************/
 int	authenticate(zbx_sock_t *sock, struct zbx_json_parse *jp)
 {
 	char		host[HOST_HOST_LEN_MAX],
 			tmp[32],
 			ip[INTERFACE_IP_LEN_MAX],
-			error[MAX_STRING_LEN];
+			error[MAX_STRING_LEN],
+			client_auth_message[MAX_STRING_LEN],
+			*password,
+			*auth_resp;
 	struct zbx_json	json;
-	int		res = FAIL;
+	int		res = FAIL, auth_enabled;
 	zbx_uint64_t	hostid;
 	unsigned short	port;
+	zbx_auth_state_t auth_state;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In respond_authenticate_handshake()");
 
 	if (FAIL == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_HOST, host, sizeof(host)))
 	{
 		zbx_snprintf(error, MAX_STRING_LEN, "%s", zbx_json_strerror());
-		return send_error_json("authenticate handshake", sock, error);
+		return send_error_json("authenticate handshake", sock, ZBX_PROTO_VALUE_FAILED, error);
 	}
 
 	if (FAIL == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_IP, ip, sizeof(ip)))
@@ -565,9 +652,38 @@ int	authenticate(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	if (FAIL == is_ushort(tmp, &port))
 		port = ZBX_DEFAULT_AGENT_PORT;
 
-	if (FAIL == get_hostid_by_host(host, ip, port, &hostid, error))
-		return send_error_json("authenticate handshake", sock, error);
+	if (FAIL == get_hostid_by_host(host, ip, port, &hostid, &auth_enabled, &password, error))
+		return send_error_json("authenticate", sock, ZBX_PROTO_VALUE_FAILED, error);
 
-	//TODO: Retrieve nonce from client's JSON packet & 
+	if (HOST_AUTH_ENABLED != auth_enabled)
+		return send_error_json("authenticate", sock, ZBX_PROTO_VALUE_NOT_SUPPORTED, error);
+
+	if (FAIL == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_AUTH_MESSAGE, client_auth_message, sizeof(client_auth_message)))
+	{
+		zbx_snprintf(error, MAX_STRING_LEN, "%s", zbx_json_strerror());
+		return send_error_json("authenticate", sock, ZBX_PROTO_VALUE_FAILED, error);
+	}
+
+	if (FAIL == ACauthenticate(hostid, password, client_auth_message, &auth_state, &auth_resp))
+	{
+		zbx_snprintf(error, MAX_STRING_LEN, "Authentication failed");
+		return send_error_json("authenticate", sock, ZBX_PROTO_VALUE_FAILED, error);
+	}
+
+	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
+	zbx_json_addstring(&json, ZBX_PROTO_TAG_RESPONSE, ZBX_PROTO_VALUE_SUCCESS, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(&json, ZBX_PROTO_TAG_AUTH_MESSAGE, auth_resp, ZBX_JSON_TYPE_STRING);
+
+	zabbix_log(LOG_LEVEL_DEBUG, "Sending [%s]", json.buffer);
+
+	alarm(CONFIG_TIMEOUT);
+	if (SUCCEED != zbx_tcp_send(sock, json.buffer))
+		zbx_snprintf(error, MAX_STRING_LEN, "%s", zbx_tcp_strerror());
+	else
+		res = SUCCEED;
+	alarm(0);
+
+	zbx_json_free(&json);
+
 	return res;
 }

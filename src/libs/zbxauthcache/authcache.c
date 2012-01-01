@@ -1,3 +1,22 @@
+/*
+** Zabbix
+** Copyright (C) 2000-2011 Zabbix SIA
+**
+** This program is free software; you can redistribute it and/or modify
+** it under the terms of the GNU General Public License as published by
+** the Free Software Foundation; either version 2 of the License, or
+** (at your option) any later version.
+**
+** This program is distributed in the hope that it will be useful,
+** but WITHOUT ANY WARRANTY; without even the implied warranty of
+** MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+** GNU General Public License for more details.
+**
+** You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software
+** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+**/
+
 #include "log.h"
 #include "mutexs.h"
 #include "zbxauthcache.h"
@@ -93,7 +112,7 @@ void	free_auth_cache()
 
 /******************************************************************************
  *                                                                            *
- * Function: ACinit_session                                                     *
+ * Function: ACinit_session                                                   *
  *                                                                            *
  * Purpose: Initializes the client's authentication session.                  *
  *                                                                            *
@@ -148,7 +167,7 @@ int	ACinit_session(zbx_uint64_t hostid, char *handshake_msg, char *challenge)
 
 /******************************************************************************
  *                                                                            *
- * Function: ACauthenticate                                                     *
+ * Function: ACauthenticate                                                   *
  *                                                                            *
  * Purpose: Receives the client's response to the authentication challenge    *
  *          and authenticate the client based on the password on the DB.      *
@@ -179,6 +198,7 @@ int	ACauthenticate(zbx_uint64_t hostid, char *stored_password,
 	 * states
 	 */
 	session = get_auth_session(hostid);
+	*auth_state = session->auth_state;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s() hostid: " ZBX_FS_UI64 " state: %d", __function_name, hostid, session->auth_state);
 
@@ -195,6 +215,7 @@ int	ACauthenticate(zbx_uint64_t hostid, char *stored_password,
 
 	session->auth_state = AUTH_STATE_AUTHENTICATED;
 	session->last_access = time(NULL);
+	*auth_state = session->auth_state;
 
 	UNLOCK_AUTH_CACHE;
 
@@ -203,7 +224,7 @@ int	ACauthenticate(zbx_uint64_t hostid, char *stored_password,
 
 /******************************************************************************
  *                                                                            *
- * Function: ACis_authenticated
+ * Function: ACis_authenticated                                               *
  *                                                                            *
  * Purpose: Check whether the host is already authenticated.                  *
  *                                                                            *

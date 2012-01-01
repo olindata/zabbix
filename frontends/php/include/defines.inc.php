@@ -245,6 +245,9 @@ define('HOST_AVAILABLE_UNKNOWN',	0);
 define('HOST_AVAILABLE_TRUE',		1);
 define('HOST_AVAILABLE_FALSE',		2);
 
+define('HOST_AUTH_ENABLED',         0);
+define('HOST_AUTH_DISABLED',        1);
+
 define('MAINTENANCE_TYPE_NORMAL',	0);
 define('MAINTENANCE_TYPE_NODATA',	1);
 

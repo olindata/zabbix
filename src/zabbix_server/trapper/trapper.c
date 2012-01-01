@@ -343,6 +343,14 @@ static int	process_trap(zbx_sock_t	*sock, char *s, int max_len)
 				{
 					ret = node_process_command(sock, s, &jp);
 				}
+				else if (0 == strcmp(value, ZBX_PROTO_VALUE_AUTHENTICATE_HANDSHAKE))
+				{
+					ret = respond_authenticate_handshake(sock, &jp);
+				}
+				else if (0 == strcmp(value, ZBX_PROTO_VALUE_AUTHENTICATE))
+				{
+					ret = authenticate(sock, &jp);
+				}
 				else
 					zabbix_log(LOG_LEVEL_WARNING, "unknown request received [%s]", value);
 			}
