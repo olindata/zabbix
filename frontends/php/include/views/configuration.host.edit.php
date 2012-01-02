@@ -36,7 +36,7 @@ $host = get_request('host', '');
 $visiblename = get_request('visiblename', '');
 $status = get_request('status', HOST_STATUS_MONITORED);
 $proxy_hostid = get_request('proxy_hostid', '');
-$auth_enabled = get_request('auth_enabled', 0);
+$auth_enabled = get_request('auth_enabled', HOST_AUTH_DISABLED);
 $auth_password = get_request('auth_password', '');
 $ipmi_authtype = get_request('ipmi_authtype', -1);
 $ipmi_privilege = get_request('ipmi_privilege', 2);
@@ -120,7 +120,7 @@ if ($_REQUEST['hostid'] > 0 && !isset($_REQUEST['form_refresh'])) {
 	$ipmi_privilege = $dbHost['ipmi_privilege'];
 	$ipmi_username = $dbHost['ipmi_username'];
 	$ipmi_password = $dbHost['ipmi_password'];
-	if ($auth_enabled == 0) {
+	if ($auth_enabled == HOST_AUTH_DISABLED) {
 		$auth_password = '';
 	}
 
@@ -310,9 +310,9 @@ $script = "javascript:
 	if(this.checked) authPassword.disabled = false;
 	else authPassword.disabled = true;";
 
-$authEnabledCheckBox = new CCheckBox('auth_enabled', $auth_enabled, $script, 1);
+$authEnabledCheckBox = new CCheckBox('auth_enabled', $auth_enabled, $script, HOST_AUTH_ENABLED);
 $authPasswordTextBox = new CTextBox('auth_password', $auth_password);
-if($auth_enabled == 0) {
+if ($auth_enabled == HOST_AUTH_DISABLED) {
 	$authPasswordTextBox->setAttribute('disabled', 'disabled');
 }
 $hostList->addRow(_('Authentication enabled'), $authEnabledCheckBox);

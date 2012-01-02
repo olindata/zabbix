@@ -220,7 +220,7 @@ elseif (isset($_REQUEST['go']) && $_REQUEST['go'] == 'massupdate' && isset($_REQ
 		foreach ($properties as $property) {
 			if (isset($visible[$property])) {
 				if($property == 'auth_enabled') {
-					$_REQUEST['auth_enabled'] = get_request('auth_enabled', 0);
+					$_REQUEST['auth_enabled'] = get_request('auth_enabled', HOST_AUTH_DISABLED);
 				}
 
 				$new_values[$property] = $_REQUEST[$property];
@@ -228,22 +228,22 @@ elseif (isset($_REQUEST['go']) && $_REQUEST['go'] == 'massupdate' && isset($_REQ
 		}
 		if(in_array('auth_enabled', $new_values)) {
 			// Disabling authentication will override mass updating passwords
-			if($new_values['auth_enabled'] == 0) {
+			if($new_values['auth_enabled'] == HOST_AUTH_DISABLED) {
 				$new_values['auth_password'] = null;
 			}
 		} else if(in_array('auth_password', $new_values)) {
 			// Enable the auth_enabled flag if it's not set yet
-			$new_values['auth_enabled'] == 1;
+			$new_values['auth_enabled'] = HOST_AUTH_ENABLED;
 		}
 
 		if(in_array('auth_enabled', $new_values)) {
 			// Disabling authentication will override mass updating passwords
-			if($new_values['auth_enabled'] == 0) {
+			if($new_values['auth_enabled'] == HOST_AUTH_DISABLED) {
 				$new_values['auth_password'] = null;
 			}
 		} else if(in_array('auth_password', $new_values)) {
 			// Enable the auth_enabled flag if it's not set yet
-			$new_values['auth_enabled'] == 1;
+			$new_values['auth_enabled'] == HOST_AUTH_ENABLED;
 		}
 
 		if (isset($visible['inventory_mode'])) {
@@ -424,10 +424,10 @@ elseif (isset($_REQUEST['save'])) {
 			'macros' => $macros,
 			'inventory' => (get_request('inventory_mode') != HOST_INVENTORY_DISABLED) ? get_request('host_inventory', array()) : array(),
 			'inventory_mode' => get_request('inventory_mode'),
-			'auth_enabled' => get_request('auth_enabled', 0),
+			'auth_enabled' => get_request('auth_enabled', HOST_AUTH_DISABLED),
 			'auth_password' => get_request('auth_password'),
 		);
-		if($host['auth_enabled'] == 0) {
+		if($host['auth_enabled'] == HOST_AUTH_DISABLED) {
 			$host['auth_password'] = null;
 		}
 

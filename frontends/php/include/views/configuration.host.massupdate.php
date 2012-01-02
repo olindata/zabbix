@@ -205,7 +205,7 @@ if ($this->data['inventory_mode'] != HOST_INVENTORY_DISABLED) {
 
 $hostForm->addRow(array(
 	new CVisibilityBox('visible[auth_enabled]', isset($this->data['visible']['auth_enabled']), 'auth_enabled', _('Original')), _('Authentication enabled')),
-	new CCheckBox('auth_enabled', $this->data['auth_enabled'], null, 1)
+	new CCheckBox('auth_enabled', $this->data['auth_enabled'], null, HOST_AUTH_ENABLED)
 );
 
 $hostForm->addRow(array(
