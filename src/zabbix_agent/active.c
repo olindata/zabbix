@@ -218,8 +218,8 @@ static int	parse_list_of_checks(char *str)
 
 	if (0 != strcmp(tmp, ZBX_PROTO_VALUE_SUCCESS))
 	{
-		if (0 == strcmp(value, ZBX_PROTO_VALUE_AUTHENTICATION_REQUIRED) ||
-				0 == strcmp(value, ZBX_PROTO_VALUE_AUTHENTICATION_FAILED))
+		if (0 == strcmp(tmp, ZBX_PROTO_VALUE_AUTHENTICATION_REQUIRED) ||
+				0 == strcmp(tmp, ZBX_PROTO_VALUE_AUTHENTICATION_FAILED))
 			authenticated = 0;
 
 		if (SUCCEED == zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_INFO, tmp, sizeof(tmp)))
@@ -1185,6 +1185,97 @@ static int	get_auth_message(char *response, char *auth_message)
 
 /******************************************************************************
  *                                                                            *
+ * Function: respond_authentication_challenge                                 *
+ *                                                                            *
+ * Purpose: Respond to the authentication challenge from the Zabbix server    *
+ *                                                                            *
+ * Parameters: host - IP or Hostname of Zabbix server                         *
+ *             port - port of Zabbix server                                   *
+ *             auth_message - The authentication message sent from the Zabbix *
+ *                            server                                          *
+ *                                                                            *
+ * Return value: returns SUCCEED on successful parsing,                       *
+ *               FAIL on other cases                                          *
+ *                                                                            *
+ * Author: Seh Hui Leong                                                      *
+ *                                                                            *
+ ******************************************************************************/
+static int respond_authentication_challenge(const char *host, unsigned short port, char *server_auth_message)
+{
+	zbx_sock_t	s;
+	char		*buf;
+	char		*auth_message;
+	char		resp_auth_message[MAX_STRING_LEN];
+	int		ret;
+	struct zbx_json	json;
+
+	zabbix_log(LOG_LEVEL_DEBUG, "process_authenticate_handshake('%s',%u)", host, port);
+
+	gsasl_property_set(auth_session, GSASL_PASSWORD, CONFIG_PASSWORD);
+	if (GSASL_NEEDS_MORE != gsasl_step64(auth_session, server_auth_message, &auth_message)) {
+		zabbix_log(LOG_LEVEL_WARNING, "Fail to generate response to server challenge");
+		return FAIL;
+	}
+
+	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
+
+	zbx_json_addstring(&json, ZBX_PROTO_TAG_REQUEST, ZBX_PROTO_VALUE_AUTHENTICATE, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(&json, ZBX_PROTO_TAG_HOST, CONFIG_HOSTNAME, ZBX_JSON_TYPE_STRING);
+	zbx_json_addstring(&json, ZBX_PROTO_TAG_AUTH_MESSAGE, auth_message, ZBX_JSON_TYPE_STRING);
+
+	if (NULL != CONFIG_LISTEN_IP)
+	{
+		char	*p;
+
+		if (NULL != (p = strchr(CONFIG_LISTEN_IP, ',')))
+			*p = '\0';
+
+		zbx_json_addstring(&json, ZBX_PROTO_TAG_IP, CONFIG_LISTEN_IP, ZBX_JSON_TYPE_STRING);
+
+		if (NULL != p)
+			*p = ',';
+	}
+
+	if (ZBX_DEFAULT_AGENT_PORT != CONFIG_LISTEN_PORT)
+		zbx_json_adduint64(&json, ZBX_PROTO_TAG_PORT, CONFIG_LISTEN_PORT);
+
+	if (SUCCEED == (ret = zbx_tcp_connect(&s, CONFIG_SOURCE_IP, host, port, CONFIG_TIMEOUT)))
+	{
+		zabbix_log(LOG_LEVEL_DEBUG, "Sending [%s]", json.buffer);
+
+		if (SUCCEED == (ret = zbx_tcp_send(&s, json.buffer)))
+		{
+			if (SUCCEED == zbx_tcp_recv(&s, &buf))
+			{
+				zabbix_log(LOG_LEVEL_DEBUG, "Got [%s]", buf);
+			}
+		}
+
+		zbx_tcp_close(&s);
+	}
+
+	zbx_json_free(&json);
+
+	if (SUCCEED != ret)
+		zabbix_log(LOG_LEVEL_DEBUG, "Get active checks error: %s", zbx_tcp_strerror());
+	else
+	{
+		if (SUCCEED == (ret = get_auth_message(buf, resp_auth_message)))
+		{
+			authenticated = 1;
+			zabbix_log(LOG_LEVEL_DEBUG, "authentication succeed");
+		}
+		else
+		{
+			zabbix_log(LOG_LEVEL_DEBUG, "authentication failed");
+		}
+	}
+
+	return ret;
+}
+
+/******************************************************************************
+ *                                                                            *
  * Function: authenticate                                                     *
  *                                                                            *
  * Purpose: Initialize authentication with the Zabbix sever                   *
@@ -1198,7 +1289,7 @@ static int	get_auth_message(char *response, char *auth_message)
  * Author: Seh Hui Leong                                                      *
  *                                                                            *
  ******************************************************************************/
-static int authenticate(char *server, unsigned short port, Gsasl *gsasl_context)
+static int authenticate(const char *host, unsigned short port, Gsasl *gsasl_context)
 {
 	zbx_sock_t	s;
 	char		*buf;
@@ -1274,95 +1365,6 @@ static int authenticate(char *server, unsigned short port, Gsasl *gsasl_context)
 	return ret;
 }
 
-/******************************************************************************
- *                                                                            *
- * Function: respond_authentication_challenge                                 *
- *                                                                            *
- * Purpose: Respond to the authentication challenge from the Zabbix server    *
- *                                                                            *
- * Parameters: host - IP or Hostname of Zabbix server                         *
- *             port - port of Zabbix server                                   *
- *             auth_message - The authentication message sent from the Zabbix *
- *                            server                                          *
- *                                                                            *
- * Return value: returns SUCCEED on successful parsing,                       *
- *               FAIL on other cases                                          *
- *                                                                            *
- * Author: Seh Hui Leong                                                      *
- *                                                                            *
- ******************************************************************************/
-static int respond_authentication_challenge(char *server, unsigned short port, char *server_auth_message)
-{
-	zbx_sock_t	s;
-	char		*buf;
-	char		*auth_message;
-	int		ret;
-	struct zbx_json	json;
-
-	zabbix_log(LOG_LEVEL_DEBUG, "process_authenticate_handshake('%s',%u)", host, port);
-
-	gsasl_property_set(auth_session, GSASL_PASSWORD, CONFIG_PASSWORD);
-	if (GSASL_NEEDS_MORE != gsasl_step64(auth_session, server_auth_message, &auth_message)) {
-		zabbix_log(LOG_LEVEL_WARNING, "Fail to generate response to server challenge");
-		return FAIL;
-	}
-
-	zbx_json_init(&json, ZBX_JSON_STAT_BUF_LEN);
-
-	zbx_json_addstring(&json, ZBX_PROTO_TAG_REQUEST, ZBX_PROTO_VALUE_AUTHENTICATE, ZBX_JSON_TYPE_STRING);
-	zbx_json_addstring(&json, ZBX_PROTO_TAG_HOST, CONFIG_HOSTNAME, ZBX_JSON_TYPE_STRING);
-	zbx_json_addstring(&json, ZBX_PROTO_TAG_AUTH_MESSAGE, auth_message, ZBX_JSON_TYPE_STRING);
-
-	if (NULL != CONFIG_LISTEN_IP)
-	{
-		char	*p;
-
-		if (NULL != (p = strchr(CONFIG_LISTEN_IP, ',')))
-			*p = '\0';
-
-		zbx_json_addstring(&json, ZBX_PROTO_TAG_IP, CONFIG_LISTEN_IP, ZBX_JSON_TYPE_STRING);
-
-		if (NULL != p)
-			*p = ',';
-	}
-
-	if (ZBX_DEFAULT_AGENT_PORT != CONFIG_LISTEN_PORT)
-		zbx_json_adduint64(&json, ZBX_PROTO_TAG_PORT, CONFIG_LISTEN_PORT);
-
-	if (SUCCEED == (ret = zbx_tcp_connect(&s, CONFIG_SOURCE_IP, host, port, CONFIG_TIMEOUT)))
-	{
-		zabbix_log(LOG_LEVEL_DEBUG, "Sending [%s]", json.buffer);
-
-		if (SUCCEED == (ret = zbx_tcp_send(&s, json.buffer)))
-		{
-			if (SUCCEED == zbx_tcp_recv(&s, &buf))
-			{
-				zabbix_log(LOG_LEVEL_DEBUG, "Got [%s]", buf);
-			}
-		}
-
-		zbx_tcp_close(&s);
-	}
-
-	zbx_json_free(&json);
-
-	if (SUCCEED != ret)
-		zabbix_log(LOG_LEVEL_DEBUG, "Get active checks error: %s", zbx_tcp_strerror());
-	else
-	{
-		if (SUCCEED == (ret = get_auth_message(buf, resp_auth_message)))
-		{
-			authenticated = 1;
-			zabbix_log(LOG_LEVEL_DEBUG, "authentication succeed");
-		}
-		else
-		{
-			zabbix_log(LOG_LEVEL_DEBUG, "authentication failed");
-		}
-	}
-
-	return ret;
-}
 #endif
 
 ZBX_THREAD_ENTRY(active_checks_thread, args)

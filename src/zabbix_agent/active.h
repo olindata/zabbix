@@ -24,7 +24,7 @@
 
 extern char	*CONFIG_SOURCE_IP;
 extern char	*CONFIG_HOSTNAME;
-extern int	*CONFIG_ENABLE_AUTH;
+extern int	CONFIG_ENABLE_AUTH;
 extern char	*CONFIG_PASSWORD;
 extern int	CONFIG_REFRESH_ACTIVE_CHECKS;
 extern int	CONFIG_BUFFER_SEND;
