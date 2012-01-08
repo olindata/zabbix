@@ -129,6 +129,7 @@ static char	shortopts[] =
 static char		*TEST_METRIC = NULL;
 int			threads_num = 0;
 ZBX_THREAD_HANDLE	*threads = NULL;
+static Gsasl		*gsasl_context = NULL;
 
 unsigned char	daemon_type = ZBX_DAEMON_TYPE_AGENT;
 
@@ -429,6 +430,10 @@ static void	zbx_load_config(int optional)
 			PARM_OPT,	0,			0},
 		{"HostnameItem",		&CONFIG_HOSTNAME_ITEM,			TYPE_STRING,
 			PARM_OPT,	0,			0},
+		{"EnableAuth",			&CONFIG_ENABLE_AUTH,			TYPE_INT,
+			PARM_OPT,	0,			1},
+		{"Password",			&CONFIG_PASSWORD,			TYPE_STRING,
+			PARM_OPT,	0,			0},
 		{"BufferSize",			&CONFIG_BUFFER_SIZE,			TYPE_INT,
 			PARM_OPT,	2,			65535},
 		{"BufferSend",			&CONFIG_BUFFER_SEND,			TYPE_INT,
@@ -570,7 +575,7 @@ int	MAIN_ZABBIX_ENTRY()
 		if (FAIL == zbx_tcp_listen(&listen_sock, CONFIG_LISTEN_IP, (unsigned short)CONFIG_LISTEN_PORT))
 		{
 			zabbix_log(LOG_LEVEL_CRIT, "listener failed: %s", zbx_tcp_strerror());
-			exit(1);
+			exit(FAIL);
 		}
 	}
 
@@ -584,6 +589,18 @@ int	MAIN_ZABBIX_ENTRY()
 	load_aliases(CONFIG_ALIASES);
 
 	zbx_free_config();
+
+	/* Initialize the authentication library */
+#ifdef HAVE_GSASL
+	if (1 == CONFIG_ENABLE_AUTH)
+	{
+		if (GSASL_OK != gsasl_init(&gsasl_context))
+		{
+			zabbix_log(LOG_LEVEL_CRIT, "Cannot initialize GSASL");
+			exit(FAIL);
+		}
+	}
+#endif
 
 	/* --- START THREADS ---*/
 
@@ -609,6 +626,10 @@ int	MAIN_ZABBIX_ENTRY()
 	/* start active check */
 	for (i = 0; i < CONFIG_ACTIVE_FORKS; i++)
 	{
+		activechk_args.host = CONFIG_HOSTS_ALLOWED;
+		activechk_args.port = (unsigned short)CONFIG_SERVER_PORT;
+		activechk_args.gsasl_context = gsasl_context;
+
 		thread_args = (zbx_thread_args_t *)zbx_malloc(NULL, sizeof(zbx_thread_args_t));
 		thread_args->thread_num = thread_num;
 		thread_args->args = &CONFIG_ACTIVE_ARGS[i];
@@ -698,6 +719,12 @@ void	zbx_on_exit()
 	free_metrics();
 	alias_list_free();
 	free_collector_data();
+
+#if HAVE_GSASL
+	if (1 == CONFIG_ENABLE_AUTH) {
+		gsasl_done(gsasl_context);
+	}
+#endif
 
 	exit(SUCCEED);
 }
