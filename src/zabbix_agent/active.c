@@ -1172,6 +1172,7 @@ static int	get_auth_message(char *response, char *auth_message)
 				0 == strcmp(value, ZBX_PROTO_VALUE_AUTHENTICATION_FAILED))
 		{
 			authenticated = 0;
+			gsasl_finish(auth_session);
 		}
 	}
 
@@ -1263,6 +1264,7 @@ static int respond_authentication_challenge(const char *host, unsigned short por
 		if (SUCCEED == (ret = get_auth_message(buf, resp_auth_message)))
 		{
 			authenticated = 1;
+			gsasl_finish(auth_session);
 			zabbix_log(LOG_LEVEL_DEBUG, "authentication succeed");
 		}
 		else
@@ -1391,6 +1393,12 @@ ZBX_THREAD_ENTRY(active_checks_thread, args)
 
 	while (ZBX_IS_RUNNING())
 	{
+		if (CONFIG_ENABLE_AUTH == HOST_AUTH_ENABLED && authenticated == 0)
+		{
+			authenticate(activechk_args.host, activechk_args.port, activechk_args.gsasl_context);
+			continue;
+		}
+
 		/* TODO: I need to figure out a way to determine when to call
 		 * the authenticate() function. */
 		if (time(NULL) >= nextsend)
