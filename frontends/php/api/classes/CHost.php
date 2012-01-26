@@ -1841,7 +1841,6 @@ class CHost extends CZBXAPI {
 			}
 		}
 
-
 		if (isset($data['groups'])) {
 			$updateGroups = $data['groups'];
 			unset($data['groups']);

@@ -310,7 +310,7 @@ $script = "javascript:
 	if(this.checked) authPassword.disabled = false;
 	else authPassword.disabled = true;";
 
-$authEnabledCheckBox = new CCheckBox('auth_enabled', ($auth_enabled === HOST_AUTH_ENABLED), $script, HOST_AUTH_ENABLED);
+$authEnabledCheckBox = new CCheckBox('auth_enabled', ($auth_enabled == HOST_AUTH_ENABLED), $script, '1');
 $authPasswordTextBox = new CTextBox('auth_password', $auth_password);
 if ($auth_enabled == HOST_AUTH_DISABLED) {
 	$authPasswordTextBox->setAttribute('disabled', 'disabled');
