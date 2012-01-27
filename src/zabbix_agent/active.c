@@ -1393,14 +1393,12 @@ ZBX_THREAD_ENTRY(active_checks_thread, args)
 
 	while (ZBX_IS_RUNNING())
 	{
-		if (CONFIG_ENABLE_AUTH == HOST_AUTH_ENABLED && authenticated == 0)
+		if (1 == CONFIG_ENABLE_AUTH && 0 == authenticated)
 		{
 			authenticate(activechk_args.host, activechk_args.port, activechk_args.gsasl_context);
 			continue;
 		}
 
-		/* TODO: I need to figure out a way to determine when to call
-		 * the authenticate() function. */
 		if (time(NULL) >= nextsend)
 		{
 			send_buffer(activechk_args.host, activechk_args.port);
