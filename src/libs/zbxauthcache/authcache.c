@@ -54,7 +54,7 @@ static ZBX_AC_SESSION *get_auth_session(zbx_uint64_t hostid);
  ******************************************************************************/
 int	init_auth_cache()
 {
-	const char	*__function_name = "ACinit_auth_cache";
+	const char	*__function_name = "init_auth_cache";
 	int		rc;
 
 	if((rc = gsasl_init(&ctx)) != GSASL_OK) {
@@ -89,7 +89,7 @@ int	init_auth_cache()
  ******************************************************************************/
 void	free_auth_cache()
 {
-	const char		*__function_name = "ACfree_auth_cache";
+	const char		*__function_name = "free_auth_cache";
 	zbx_hashset_iter_t	iter;
 	ZBX_AC_SESSION		*session;
 
@@ -118,7 +118,8 @@ void	free_auth_cache()
  *                                                                            *
  * Parameters: hostid - [IN] The host id                                      *
  *             handshake_msg - [IN] The handshake message from the client.    *
- *             challenge - [OUT] The challenge issued from the server.        *
+ *             challenge - [OUT] The challenge issued from the server. Must   *
+ *                               be free()'ed after use.                      *
  *                                                                            *
  * Return value: SUCCEED - An authentication session is initiated             *
  *               FAIL - An error occurred or the session cannot be initiated  *
@@ -126,11 +127,10 @@ void	free_auth_cache()
  * Author: Seh Hui Leong                                                      *
  *                                                                            *
  ******************************************************************************/
-int	ACinit_session(zbx_uint64_t hostid, char *handshake_msg, char *challenge)
+int	ACinit_session(zbx_uint64_t hostid, char *handshake_msg, char **challenge)
 {
 	const char	*__function_name = "ACinit_session";
 	ZBX_AC_SESSION	*session;
-	char		buf[BUFSIZ] = "";
 
 	LOCK_AUTH_CACHE;
 
@@ -147,18 +147,20 @@ int	ACinit_session(zbx_uint64_t hostid, char *handshake_msg, char *challenge)
 	) {
 		session->auth_state = AUTH_STATE_NOT_AUTH;
 		gsasl_finish(session->session);
+		session->session = NULL;
 	}
 
-	if(gsasl_server_start(ctx, mech, &session->session) != GSASL_OK) {
+	if(gsasl_server_start(ctx, mech, &session->session) != GSASL_OK)
+	{
 		return FAIL;
 	}
-	if(gsasl_step64(session->session, handshake_msg, &buf) != GSASL_NEEDS_MORE) {
+	if(gsasl_step64(session->session, handshake_msg, challenge) != GSASL_NEEDS_MORE)
+	{
 		return FAIL;
 	}
 
 	/* Once a valid handshake is received, return a challenge */
 	session->auth_state = AUTH_STATE_HANDSHAKE;
-	challenge = buf;
 
 	UNLOCK_AUTH_CACHE;
 
@@ -178,6 +180,7 @@ int	ACinit_session(zbx_uint64_t hostid, char *handshake_msg, char *challenge)
  *                              challenge                                     *
  *             auth_state - [OUT] The authentication state the host is in     *
  *             auth_resp - [OUT] The server's response after authentication.  *
+ *                               Must be free()'ed after use.                 *
  *                                                                            *
  * Return value:  SUCCEED - The client is authenticated.                      *
  *                FAIL - an error occurred or session object cannot be set    *
@@ -186,11 +189,10 @@ int	ACinit_session(zbx_uint64_t hostid, char *handshake_msg, char *challenge)
  *                                                                            *
  ******************************************************************************/
 int	ACauthenticate(zbx_uint64_t hostid, char *stored_password,
-        char *challenge_resp, zbx_auth_state_t *auth_state, char *auth_resp)
+        char *challenge_resp, zbx_auth_state_t *auth_state, char **auth_resp)
 {
 	const char	*__function_name = "ACauthenticate";
 	ZBX_AC_SESSION	*session;
-	char		buf[BUFSIZ] = "";
 
 	LOCK_AUTH_CACHE;
 
@@ -207,7 +209,8 @@ int	ACauthenticate(zbx_uint64_t hostid, char *stored_password,
 	}
 
 	gsasl_property_set(session->session, GSASL_PASSWORD, stored_password);
-	if(gsasl_step64(session->session, challenge_resp, &buf) != GSASL_OK) {
+	if(gsasl_step64(session->session, challenge_resp, auth_resp) != GSASL_OK)
+	{
 		gsasl_finish(session->session);
 		session->auth_state = AUTH_STATE_FAILED;
 		return FAIL;
@@ -238,7 +241,7 @@ int	ACauthenticate(zbx_uint64_t hostid, char *stored_password,
  ******************************************************************************/
 int	ACis_authenticated(zbx_uint64_t hostid)
 {
-	const char	*__function_name = "ACauthenticate";
+	const char	*__function_name = "ACis_authenticated";
 	ZBX_AC_SESSION	*session;
 	int		res = FAIL;
 
@@ -251,7 +254,6 @@ int	ACis_authenticated(zbx_uint64_t hostid)
 		"In %s() hostid: " ZBX_FS_UI64 " state: %d lastaccess: %d",
 		__function_name, hostid, session->auth_state, session->last_access);
 
-	/* TODO: Check the timeout as well */
 	if(
 		session->auth_state == AUTH_STATE_AUTHENTICATED &&
 		(session->last_access + AUTH_SESSION_TIMEOUT) > time(NULL)
@@ -276,11 +278,14 @@ int	ACis_authenticated(zbx_uint64_t hostid)
  ******************************************************************************/
 static ZBX_AC_SESSION *get_auth_session(zbx_uint64_t hostid)
 {
-	ZBX_AC_SESSION	*ptr, session;
+	const char	*__function_name = "get_auth_session";
+	ZBX_AC_SESSION	*ptr = NULL, session;
 
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() hostid: " ZBX_FS_UI64, __function_name, hostid);
 	if (NULL != (ptr = (ZBX_AC_SESSION *)zbx_hashset_search(&auth_sessions, &hostid)))
 		return ptr;
 
+	zabbix_log(LOG_LEVEL_DEBUG, "In %s() creating session for hostid: " ZBX_FS_UI64, __function_name, hostid);
 	memset(&session, 0, sizeof(ZBX_AC_SESSION));
 	session.hostid = hostid;
 

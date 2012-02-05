@@ -1148,7 +1148,7 @@ ret:
  * Author: Seh Hui Leong                                                      *
  *                                                                            *
  ******************************************************************************/
-static int	get_auth_message(char *response, char *auth_message)
+static int	get_auth_message(char *response, char *auth_message, int buf_size)
 {
 	const char		*__function_name = "get_auth_message";
 
@@ -1176,8 +1176,9 @@ static int	get_auth_message(char *response, char *auth_message)
 		}
 	}
 
-	if (SUCCEED == ret && SUCCEED != zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_AUTH_MESSAGE, auth_message, sizeof(auth_message)))
-		ret = FAIL;
+	if (SUCCEED == ret &&
+			SUCCEED != zbx_json_value_by_name(&jp, ZBX_PROTO_TAG_AUTH_MESSAGE, auth_message, buf_size)
+	) ret = FAIL;
 
 	zabbix_log(LOG_LEVEL_DEBUG, "End of %s():%s", __function_name, zbx_result_string(ret));
 
@@ -1256,12 +1257,13 @@ static int respond_authentication_challenge(const char *host, unsigned short por
 	}
 
 	zbx_json_free(&json);
+	free(auth_message);
 
 	if (SUCCEED != ret)
 		zabbix_log(LOG_LEVEL_DEBUG, "Get active checks error: %s", zbx_tcp_strerror());
 	else
 	{
-		if (SUCCEED == (ret = get_auth_message(buf, resp_auth_message)))
+		if (SUCCEED == (ret = get_auth_message(buf, resp_auth_message, sizeof(resp_auth_message))))
 		{
 			authenticated = 1;
 			gsasl_finish(auth_session);
@@ -1353,12 +1355,13 @@ static int authenticate(const char *host, unsigned short port, Gsasl *gsasl_cont
 	}
 
 	zbx_json_free(&json);
+	free(auth_message);
 
 	if (SUCCEED != ret)
 		zabbix_log(LOG_LEVEL_DEBUG, "authentication error: %s", zbx_tcp_strerror());
 	else
 	{
-		if (SUCCEED == (ret = get_auth_message(buf, resp_auth_message)))
+		if (SUCCEED == (ret = get_auth_message(buf, resp_auth_message, sizeof(resp_auth_message))))
 			ret = respond_authentication_challenge(host, port, resp_auth_message);
 		else
 			zabbix_log(LOG_LEVEL_DEBUG, "authentication handshake error");

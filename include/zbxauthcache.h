@@ -26,10 +26,10 @@
 int	init_auth_cache();
 void	free_auth_cache();
 int	ACinit_session(zbx_uint64_t hostid, char *handshake_msg,
-		char *challenge);
+		char **challenge);
 int	ACauthenticate(zbx_uint64_t hostid, char *stored_password,
 		char *challenge_resp, zbx_auth_state_t *auth_status,
-		char *auth_resp);
+		char **auth_resp);
 int	ACis_authenticated(zbx_uint64_t hostid);
 
 #endif

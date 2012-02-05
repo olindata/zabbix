@@ -581,7 +581,7 @@ int	respond_authenticate_handshake(zbx_sock_t *sock, struct zbx_json_parse *jp)
 		return send_error_json("authenticate handshake", sock, ZBX_PROTO_VALUE_FAILED, error);
 	}
 
-	if (FAIL == ACinit_session(hostid, client_auth_message, auth_challenge))
+	if (FAIL == ACinit_session(hostid, client_auth_message, &auth_challenge))
 	{
 		zbx_snprintf(error, MAX_STRING_LEN, "%s", zbx_json_strerror());
 		return send_error_json("authenticate handshake", sock, ZBX_PROTO_VALUE_FAILED, error);
@@ -601,6 +601,7 @@ int	respond_authenticate_handshake(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	alarm(0);
 
 	zbx_json_free(&json);
+	free(auth_challenge);
 
 	return res;
 }
@@ -635,7 +636,7 @@ int	authenticate(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	unsigned short	port;
 	zbx_auth_state_t auth_state;
 
-	zabbix_log(LOG_LEVEL_DEBUG, "In respond_authenticate_handshake()");
+	zabbix_log(LOG_LEVEL_DEBUG, "In authenticate()");
 
 	if (FAIL == zbx_json_value_by_name(jp, ZBX_PROTO_TAG_HOST, host, sizeof(host)))
 	{
@@ -684,6 +685,7 @@ int	authenticate(zbx_sock_t *sock, struct zbx_json_parse *jp)
 	alarm(0);
 
 	zbx_json_free(&json);
+	free(auth_resp);
 
 	return res;
 }
