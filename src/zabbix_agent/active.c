@@ -1399,6 +1399,7 @@ ZBX_THREAD_ENTRY(active_checks_thread, args)
 		if (1 == CONFIG_ENABLE_AUTH && 0 == authenticated)
 		{
 			authenticate(activechk_args.host, activechk_args.port, activechk_args.gsasl_context);
+			zbx_sleep(1);
 			continue;
 		}
 
