@@ -36,7 +36,7 @@ AC_DEFUN([LIBGSASL_CHECK_CONFIG],
 
   if test "x$_libgsasl_with" != x"no" ; then
     if test "$_libgsasl_with" = "yes"; then
-      PKG_CHECK_MODULES(GSASL, libgsasl >= 1.6.1,
+      PKG_CHECK_MODULES(GSASL, libgsasl >= 1.4.0,
         [
           GSASL_INCDIR=$GSASL_CPPFLAGS
           GSASL_LIBDIR=$GSASL_LIBS
