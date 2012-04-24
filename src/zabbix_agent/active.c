@@ -37,25 +37,32 @@
 #	include "daemon.h"
 #endif
 
+#if HAVE_GSASL
+#define AUTH_MECH		"SCRAM-SHA-1"
+#endif
+
 #ifdef _WINDOWS
 __declspec(thread) static ZBX_ACTIVE_METRIC	*active_metrics = NULL;
 __declspec(thread) static ZBX_ACTIVE_BUFFER	buffer;
 __declspec(thread) static ZBX_REGEXP		*regexps = NULL;
 __declspec(thread) static int			regexps_alloc = 0;
 __declspec(thread) static int			regexps_num = 0;
+#if HAVE_GSASL
+__declspec(thread) static int			authenticated = 0;
+__declspec(thread) static Gsasl_session		*auth_session = NULL;
+#endif /* HAVE_GSASL */
 #else
 static ZBX_ACTIVE_METRIC	*active_metrics = NULL;
 static ZBX_ACTIVE_BUFFER	buffer;
 static ZBX_REGEXP		*regexps = NULL;
 static int			regexps_alloc = 0;
 static int			regexps_num = 0;
-static int			regexps_alloc = 0, regexps_num = 0;
 #if HAVE_GSASL
-#define AUTH_MECH		"SCRAM-SHA-1"
 static int			authenticated = 0;
 static Gsasl_session		*auth_session = NULL;
->>>>>>> Implemented the authentication code on agent; pending review.
-#endif
+#endif /* HAVE_GSASL */
+#endif /* _WINDOWS */
+
 
 static void	init_active_metrics()
 {
@@ -1378,8 +1385,6 @@ ZBX_THREAD_ENTRY(active_checks_thread, args)
 
 	int	nextcheck = 0, nextrefresh = 0, nextsend = 0;
 	char	*p = NULL;
-#if HAVE_GSASL
-	Gsasl	*gsasl_context;
 
 	assert(args);
 	assert(((zbx_thread_args_t *)args)->args);
@@ -1444,6 +1449,12 @@ ZBX_THREAD_ENTRY(active_checks_thread, args)
 	}
 
 	zbx_free(activechk_args.host);
+#if HAVE_GSASL
+	if (1 == CONFIG_ENABLE_AUTH) {
+		gsasl_done(activechk_args.gsasl_context);
+	}
+#endif
+
 	free_active_metrics();
 
 	zabbix_log(LOG_LEVEL_INFORMATION, "zabbix_agentd active check stopped");
