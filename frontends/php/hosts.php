@@ -52,6 +52,8 @@ $fields = array(
 	'visiblename' =>	array(T_ZBX_STR, O_OPT, null,		null,		'isset({save})'),
 	'proxy_hostid' =>	array(T_ZBX_INT, O_OPT, P_SYS,		DB_ID,		'isset({save})'),
 	'status' =>		array(T_ZBX_INT, O_OPT, null,		IN('0,1,3'),	'isset({save})'),
+	'auth_enabled'=>	array(T_ZBX_INT, O_OPT, null,			null,		null),
+	'auth_password'=>	array(T_ZBX_STR, O_OPT, null,			null,		null),
 	'newgroup' =>		array(T_ZBX_STR, O_OPT, null,		null,		null),
 	'interfaces' =>		array(T_ZBX_STR, O_OPT, null,		NOT_EMPTY,	'isset({save})', _('Agent or SNMP or JMX or IPMI interface')),
 	'mainInterfaces' =>	array(T_ZBX_INT, O_OPT, null,		DB_ID,		null),
@@ -218,12 +220,29 @@ elseif (isset($_REQUEST['go']) && $_REQUEST['go'] == 'massupdate' && isset($_REQ
 
 		$hosts = array('hosts' => zbx_toObject($hostids, 'hostid'));
 
-		$properties = array('proxy_hostid', 'ipmi_authtype', 'ipmi_privilege', 'ipmi_username', 'ipmi_password', 'status');
+		$properties = array('proxy_hostid', 'ipmi_authtype', 'ipmi_privilege', 'ipmi_username', 'ipmi_password', 'status', 'auth_enabled', 'auth_password');
 		$new_values = array();
 		foreach ($properties as $property) {
 			if (isset($visible[$property])) {
+				if($property == 'auth_enabled') {
+					$_REQUEST['auth_enabled'] = (get_request('auth_enabled', 0) == 1) ?
+							HOST_AUTH_ENABLED : HOST_AUTH_DISABLED;
+				}
 				$new_values[$property] = $_REQUEST[$property];
 			}
+		}
+		// Note: If both auth_enabled and auth_password are set and
+		// auth_enabled is uncheck (i.e. disable authentication), the
+		// auth_enabled setting will be honored and auth_password
+		// disregarded
+		if(array_key_exists('auth_enabled', $new_values)) {
+			// Disabling authentication will override mass updating passwords
+			if($new_values['auth_enabled'] == HOST_AUTH_DISABLED) {
+				$new_values['auth_password'] = null;
+			}
+		} else if(array_key_exists('auth_password', $new_values)) {
+			// Enable the auth_enabled flag if it's not set yet
+			$new_values['auth_enabled'] = HOST_AUTH_ENABLED;
 		}
 
 		if (isset($visible['inventory_mode'])) {
@@ -385,8 +404,14 @@ elseif (isset($_REQUEST['save'])) {
 			'interfaces' => $interfaces,
 			'macros' => $macros,
 			'inventory' => (get_request('inventory_mode') != HOST_INVENTORY_DISABLED) ? get_request('host_inventory', array()) : array(),
-			'inventory_mode' => get_request('inventory_mode')
+			'inventory_mode' => get_request('inventory_mode'),
+			'auth_enabled' => (get_request('auth_enabled', 0) == 1) ? HOST_AUTH_ENABLED : HOST_AUTH_DISABLED,
+			'auth_password' => get_request('auth_password'),
 		);
+
+		if($host['auth_enabled'] == HOST_AUTH_DISABLED) {
+			$host['auth_password'] = null;
+		}
 
 		if ($create_new) {
 			$hostids = API::Host()->create($host);
@@ -584,7 +609,9 @@ if ($_REQUEST['go'] == 'massupdate' && isset($_REQUEST['hosts'])) {
 		'ipmi_password' => get_request('ipmi_password', ''),
 		'inventory_mode' => get_request('inventory_mode', HOST_INVENTORY_DISABLED),
 		'host_inventory' => get_request('host_inventory', array()),
-		'templates' => get_request('templates', array())
+		'templates' => get_request('templates', array()),
+		'auth_enabled' => (get_request('auth_enabled', 0) == 1) ? HOST_AUTH_ENABLED : HOST_AUTH_DISABLED,
+		'auth_password' => get_request('auth_password')
 	);
 
 	// sort templates

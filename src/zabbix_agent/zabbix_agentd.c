@@ -429,6 +429,10 @@ static void	zbx_load_config(int requirement)
 			PARM_OPT,	0,			0},
 		{"HostnameItem",		&CONFIG_HOSTNAME_ITEM,			TYPE_STRING,
 			PARM_OPT,	0,			0},
+		{"EnableAuth",			&CONFIG_ENABLE_AUTH,			TYPE_INT,
+			PARM_OPT,	0,			0},
+		{"Password",			&CONFIG_PASSWORD,			TYPE_STRING,
+			PARM_OPT,	0,			0},
 		{"BufferSize",			&CONFIG_BUFFER_SIZE,			TYPE_INT,
 			PARM_OPT,	2,			65535},
 		{"BufferSend",			&CONFIG_BUFFER_SEND,			TYPE_INT,
@@ -570,7 +574,7 @@ int	MAIN_ZABBIX_ENTRY()
 		if (FAIL == zbx_tcp_listen(&listen_sock, CONFIG_LISTEN_IP, (unsigned short)CONFIG_LISTEN_PORT))
 		{
 			zabbix_log(LOG_LEVEL_CRIT, "listener failed: %s", zbx_tcp_strerror());
-			exit(1);
+			exit(FAIL);
 		}
 	}
 

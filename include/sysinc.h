@@ -426,4 +426,8 @@
 #	include <mntent.h>
 #endif
 
+#ifdef HAVE_GSASL
+#	include <gsasl.h>
+#endif
+
 #endif

@@ -553,6 +553,10 @@ typedef enum
 #define HOST_AVAILABLE_TRUE	1
 #define HOST_AVAILABLE_FALSE	2
 
+/* host authentication enabled */
+#define HOST_AUTH_ENABLED	0
+#define HOST_AUTH_DISABLED	1
+
 /* trigger statuses */
 #define TRIGGER_STATUS_ENABLED	0
 #define TRIGGER_STATUS_DISABLED	1
@@ -765,6 +769,13 @@ typedef enum
 	HTTPTEST_AUTH_BASIC,
 	HTTPTEST_AUTH_NTLM
 } zbx_httptest_auth_t;
+
+typedef enum {
+	AUTH_STATE_NOT_AUTH = 0,
+	AUTH_STATE_AUTHENTICATED,
+	AUTH_STATE_FAILED
+}
+zbx_auth_state_t;
 
 #define ZBX_TASK_FLAG_MULTIPLE_AGENTS 0x01
 

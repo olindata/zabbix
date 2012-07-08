@@ -1,6 +1,7 @@
 ## Process this file with automake to produce Makefile.in
 
 DIST_SUBDIRS = \
+	zbxauthcache \
 	zbxdbcache \
 	zbxdbhigh \
 	zbxdb \
@@ -24,6 +25,7 @@ DIST_SUBDIRS = \
 
 if PROXY
 PROXY_SUBDIRS = \
+	zbxauthcache \
 	zbxcommshigh \
 	zbxdb \
 	zbxdbcache \
@@ -36,6 +38,7 @@ endif
 
 if SERVER
 SERVER_SUBDIRS = \
+	zbxauthcache \
 	zbxcommshigh \
 	zbxdb \
 	zbxdbcache \

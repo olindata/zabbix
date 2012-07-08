@@ -27,6 +27,7 @@
 #include "strpool.h"
 #include "zbxserver.h"
 #include "zbxalgo.h"
+#include "zbxauthcache.h"
 
 static int	sync_in_progress = 0;
 #define	LOCK_CACHE	if (0 == sync_in_progress) zbx_mutex_lock(&config_lock)
@@ -202,6 +203,7 @@ typedef struct
 	unsigned char	ipmi_available;
 	unsigned char	jmx_available;
 	unsigned char	status;
+	int		auth_enabled;
 }
 ZBX_DC_HOST;
 
@@ -1622,6 +1624,7 @@ static void	DCsync_hosts(DB_RESULT result)
 		host->maintenance_type = (unsigned char)atoi(row[8]);
 		host->maintenance_from = atoi(row[9]);
 		host->status = status;
+		host->auth_enabled = atoi(row[24]);
 
 		if (0 == found)
 		{
@@ -2359,7 +2362,7 @@ void	DCsync_configuration()
 				"errors_from,available,disable_until,snmp_errors_from,"
 				"snmp_available,snmp_disable_until,ipmi_errors_from,ipmi_available,"
 				"ipmi_disable_until,jmx_errors_from,jmx_available,jmx_disable_until,"
-				"status,name"
+				"status,name,auth_enabled"
 			" from hosts"
 			" where status in (%d,%d,%d)"
 				DB_NODE,
@@ -3760,6 +3763,17 @@ int	DCconfig_get_poller_items(unsigned char poller_type, DC_ITEM *items, int max
 
 			DCincrease_disable_until(dc_item, dc_host, now);
 		}
+
+#ifdef HAVE_GSASL
+		if (HOST_AUTH_ENABLED == dc_host->auth_enabled && FAIL == ACis_authenticated(dc_host->hostid))
+		{
+			old_nextcheck = dc_item->nextcheck;
+			dc_item->nextcheck = DCget_reachable_nextcheck(dc_item, now);
+
+			DCupdate_item_queue(dc_item, dc_item->poller_type, old_nextcheck);
+			continue;
+		}
+#endif
 
 		dc_item_prev = dc_item;
 		dc_item->location = ZBX_LOC_POLLER;

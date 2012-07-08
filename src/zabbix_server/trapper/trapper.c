@@ -43,6 +43,9 @@
 
 extern unsigned char	daemon_type;
 extern unsigned char	process_type;
+#ifdef	HAVE_GSASL
+static Gsasl		*ctx;
+#endif
 
 /******************************************************************************
  *                                                                            *
@@ -343,6 +346,12 @@ static int	process_trap(zbx_sock_t	*sock, char *s, int max_len)
 				{
 					ret = node_process_command(sock, s, &jp);
 				}
+#ifdef	HAVE_GSASL
+				else if (0 == strcmp(value, ZBX_PROTO_VALUE_AUTHENTICATE_HANDSHAKE))
+				{
+					ret = process_authentication_request(sock, &jp, ctx);
+				}
+#endif
 				else
 					zabbix_log(LOG_LEVEL_WARNING, "unknown request received [%s]", value);
 			}
@@ -413,6 +422,12 @@ void	main_trapper_loop(zbx_sock_t *s)
 	const char	*__function_name = "main_trapper_loop";
 
 	zabbix_log(LOG_LEVEL_DEBUG, "In %s()", __function_name);
+
+#ifdef	HAVE_GSASL
+	if (GSASL_OK != gsasl_init(&ctx)) {
+		exit(FAIL);
+	}
+#endif
 
 	zbx_setproctitle("%s [connecting to the database]", get_process_type_string(process_type));
 

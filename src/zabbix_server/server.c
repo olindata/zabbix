@@ -26,6 +26,7 @@
 #include "log.h"
 #include "zbxgetopt.h"
 #include "mutexs.h"
+#include "zbxauthcache.h"
 
 #include "sysinfo.h"
 #include "zbxserver.h"
@@ -138,6 +139,9 @@ int	CONFIG_CONF_CACHE_SIZE		= 8 * ZBX_MEBIBYTE;
 int	CONFIG_HISTORY_CACHE_SIZE	= 8 * ZBX_MEBIBYTE;
 int	CONFIG_TRENDS_CACHE_SIZE	= 4 * ZBX_MEBIBYTE;
 int	CONFIG_TEXT_CACHE_SIZE		= 16 * ZBX_MEBIBYTE;
+#ifdef HAVE_GSASL
+int	AUTH_CACHE_SIZE			= 4 * ZBX_MEBIBYTE;
+#endif
 int	CONFIG_DISABLE_HOUSEKEEPING	= 0;
 int	CONFIG_UNREACHABLE_PERIOD	= 45;
 int	CONFIG_UNREACHABLE_DELAY	= 15;
@@ -309,6 +313,10 @@ static void	zbx_load_config()
 			PARM_OPT,	128 * ZBX_KIBIBYTE,	ZBX_GIBIBYTE},
 		{"HistoryTextCacheSize",	&CONFIG_TEXT_CACHE_SIZE,		TYPE_INT,
 			PARM_OPT,	128 * ZBX_KIBIBYTE,	ZBX_GIBIBYTE},
+#ifdef HAVE_GSASL
+		{"AuthCacheSize",			&AUTH_CACHE_SIZE,		TYPE_INT,
+			PARM_OPT,	128 * ZBX_KIBIBYTE,	ZBX_GIBIBYTE},
+#endif
 		{"CacheUpdateFrequency",	&CONFIG_CONFSYNCER_FREQUENCY,		TYPE_INT,
 			PARM_OPT,	1,			SEC_PER_HOUR},
 		{"HousekeepingFrequency",	&CONFIG_HOUSEKEEPING_FREQUENCY,		TYPE_INT,
@@ -500,6 +508,7 @@ int	MAIN_ZABBIX_ENTRY()
 	pid_t		pid;
 	zbx_sock_t	listen_sock;
 	int		i, server_num = 0, server_count = 0;
+	int		rc;
 
 	if (NULL == CONFIG_LOG_FILE || '\0' == *CONFIG_LOG_FILE)
 		zabbix_open_log(LOG_TYPE_SYSLOG, CONFIG_LOG_LEVEL, NULL);
@@ -564,6 +573,10 @@ int	MAIN_ZABBIX_ENTRY()
 
 #ifdef	HAVE_SQLITE3
 	zbx_create_sqlite3_mutex(CONFIG_DBNAME);
+#endif
+
+#ifdef HAVE_GSASL
+	init_auth_cache();
 #endif
 
 	DBconnect(ZBX_DB_CONNECT_NORMAL);
@@ -819,6 +832,10 @@ void	zbx_on_exit()
 
 #ifdef HAVE_SQLITE3
 	zbx_remove_sqlite3_mutex();
+#endif
+
+#ifdef HAVE_GSASL
+	free_auth_cache();
 #endif
 
 	free_selfmon_collector();

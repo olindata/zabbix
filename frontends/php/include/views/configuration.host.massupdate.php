@@ -18,7 +18,6 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **/
 
-
 require_once dirname(__FILE__).'/js/configuration.host.edit.js.php';
 
 // create form
@@ -170,6 +169,22 @@ $hostFormList->addRow(
 		new CVisibilityBox('visible[ipmi_password]', isset($this->data['visible']['ipmi_password']), 'ipmi_password', _('Original'))
 	),
 	new CTextBox('ipmi_password', $this->data['ipmi_password'], ZBX_TEXTBOX_SMALL_SIZE)
+);
+
+$hostFormList->addRow(
+    array(
+        _('Authentication enabled'),
+        new CVisibilityBox('visible[auth_enabled]', isset($this->data['visible']['auth_enabled']), 'auth_enabled', _('Original'))
+    ),
+	new CCheckBox('auth_enabled', ($this->data['auth_enabled'] == HOST_AUTH_ENABLED))
+);
+
+$hostFormList->addRow(
+    array(
+        _('Password'),
+        new CVisibilityBox('visible[auth_password]', isset($this->data['visible']['auth_password']), 'auth_password', _('Original'))
+    ),
+	new CTextBox('auth_password', $this->data['auth_password'], ZBX_TEXTBOX_SMALL_SIZE)
 );
 
 // append inventories to form list

@@ -103,5 +103,10 @@ int	get_value_agent(DC_ITEM *item, AGENT_RESULT *result)
 	}
 	zbx_tcp_close(&s);
 
+#ifdef HAVE_GSASL
+	if (ret == SUCCEED) {
+		ACrefresh_last_access(item->host.hostid);
+	}
+#endif
 	return ret;
 }
